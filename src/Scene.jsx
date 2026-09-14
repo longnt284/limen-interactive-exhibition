@@ -1,6 +1,5 @@
-import React,{useMemo,useRef,useEffect} from 'react';
+import React,{useMemo,useRef,useEffect,useState} from 'react';
 import {Canvas,useFrame,useThree} from '@react-three/fiber';
-import {Environment,Lightformer} from '@react-three/drei';
 import * as THREE from 'three';
 const COUNT=180;
 // One mesh for the entire journey; no model loading at chapter boundaries.
@@ -36,7 +35,19 @@ function Forms({signal,paused,reduced,speed,pointer}){
   group.current.scale.setScalar(size.width<700?.64:.9);
   group.current.rotation.set(.22+(!paused&&!reduced?pointer.current.y*.12:0),-.3+(reduced?a:p)*.38+time.current*.08+signal.current.turn,-.2+(!paused&&!reduced?pointer.current.x*.1:0));
  });
- return <group ref={group}><instancedMesh ref={mesh} args={[null,null,COUNT]} frustumCulled={false}><boxGeometry args={[1,1,1]}/><meshStandardMaterial metalness={.93} roughness={.27}/></instancedMesh></group>
+ return <group ref={group}><instancedMesh ref={mesh} args={[null,null,COUNT]} frustumCulled={false}><boxGeometry args={[1,1,1]}/><meshStandardMaterial metalness={.72} roughness={.3}/></instancedMesh></group>
 }
-export default function Scene(props){return <Canvas frameloop={props.paused||props.reduced||props.hidden?'demand':'always'} dpr={[1,1.4]} camera={{position:[0,0,8.5],fov:42}} gl={{alpha:true,antialias:true,powerPreference:'high-performance'}}><ambientLight intensity={.5}/><directionalLight position={[3,4,5]} intensity={2}/><Forms {...props}/><Environment resolution={64}><color attach="background" args={['#637267']}/><Lightformer intensity={4} position={[-3,2,4]} scale={[2,7,1]}/><Lightformer intensity={3} position={[3,0,2]} scale={[1,6,1]}/><Lightformer intensity={2} color="#d0eb9f" position={[0,-4,1]} scale={[7,1,1]}/></Environment></Canvas>}
+function SceneFallback(){return <div className="model-fallback"><div className="model-fallback-form"/><span>Không thể khởi tạo WebGL trên thiết bị này</span></div>}
+export default function Scene(props){
+ const [contextLost,setContextLost]=useState(false);
+ if(contextLost)return <SceneFallback/>;
+ return <Canvas fallback={<SceneFallback/>} frameloop={props.paused||props.reduced||props.hidden?'demand':'always'} dpr={[1,1.25]} camera={{position:[0,0,8.5],fov:42}} gl={{alpha:false,antialias:true,powerPreference:'default',failIfMajorPerformanceCaveat:false}} onCreated={({gl})=>gl.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();setContextLost(true)},{once:true})}>
+  <color attach="background" args={['#263a31']}/>
+  <ambientLight intensity={.4} color="#e5ede7"/>
+  <hemisphereLight args={['#eef5ef','#17271f',1.15]}/>
+  <directionalLight position={[4,6,5]} intensity={2.2} color="#f6fff7"/>
+  <directionalLight position={[-4,-2,3]} intensity={1.35} color="#d0e99d"/>
+  <Forms {...props}/>
+ </Canvas>
+}
 

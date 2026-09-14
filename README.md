@@ -10,7 +10,7 @@ npm install
 npm run dev
 ```
 
-`npm run build` tạo bản tĩnh trong `dist/`. `npm run preview` xem bản production. Phiên xem trước hiện tại: http://127.0.0.1:5184/.
+`npm run build` tạo bản tĩnh trong `dist/`. `npm run preview` xem bản production. Bản triển khai: https://limen-interactive-exhibition.vercel.app/.
 
 ## Trải nghiệm
 
@@ -22,7 +22,9 @@ npm run dev
 
 ## Hiệu năng và cấu trúc
 
-Một canvas xuyên suốt, một InstancedMesh với 180 phần tử và geometry/material dùng chung. Các trạng thái hình học tính trước, vị trí/quaternion/tỉ lệ nội suy theo tiến độ ScrollTrigger. Không tải mô hình giữa các chương, không chặn wheel/touch, không đặt React state trong vòng render. Giới hạn DPR 1.4 và environment 64 px. Dùng render theo yêu cầu khi dừng, giảm motion hoặc tab ẩn.
+Một canvas xuyên suốt, một InstancedMesh với 180 phần tử và geometry/material dùng chung. Các trạng thái hình học tính trước, vị trí/quaternion/tỉ lệ nội suy theo tiến độ ScrollTrigger. Không tải mô hình giữa các chương, không chặn wheel/touch, không đặt React state trong vòng render. Giới hạn DPR 1.25 và dùng hệ đèn trực tiếp để giảm shader/render-target. Dùng render theo yêu cầu khi dừng, giảm motion hoặc tab ẩn.
+
+Three.js được khóa ở r162 để hỗ trợ cả WebGL 1 và WebGL 2. Trước khi tải scene, ứng dụng kiểm tra khả năng tạo context; nếu WebGL không khả dụng hoặc context bị mất, giao diện dùng một hình thái CSS thay thế thay vì để trống màn hình.
 
 - `src/chapters.js`: nội dung tám chương.
 - `src/main.jsx`: bố cục, điều khiển và ScrollTrigger.
@@ -31,4 +33,4 @@ Một canvas xuyên suốt, một InstancedMesh với 180 phần tử và geomet
 - `archive/single-gallery`: bản nguồn ba tác phẩm trước khi mở rộng.
 - `references/repos`: 12 repo tham khảo, không đưa vào bundle. Manifest commit ở `references/repositories.json`.
 
-Xem `VERIFICATION.md` để biết phạm vi kiểm thử và giới hạn. Website chạy local, chưa xuất bản công khai.
+Xem `VERIFICATION.md` để biết phạm vi kiểm thử và giới hạn.

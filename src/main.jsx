@@ -23,8 +23,19 @@ import './style.css';
 gsap.registerPlugin(ScrollTrigger);
 const Scene=lazy(()=>import('./Scene'));
 class Boundary extends Component{state={error:false};static getDerivedStateFromError(){return{error:true}}render(){return this.state.error?<div className="fallback" role="status">Cảnh 3D không khả dụng trên trình duyệt này. Hành trình nội dung vẫn tiếp tục.</div>:this.props.children}}
+function canUseWebGL(){
+ try{
+  const canvas=document.createElement('canvas');
+  const options={alpha:false,antialias:false,failIfMajorPerformanceCaveat:false};
+  const context=canvas.getContext('webgl2',options)||canvas.getContext('webgl',options)||canvas.getContext('experimental-webgl',options);
+  if(!context)return false;
+  context.getExtension('WEBGL_lose_context')?.loseContext();
+  return true;
+ }catch{return false}
+}
+function ModelFallback(){return <div className="model-fallback"><div className="model-fallback-form"/><span>Thiết bị đang dùng chế độ hình ảnh tương thích</span></div>}
 function App(){
- const [active,setActive]=useState(0),[reduced,setReduced]=useState(matchMedia('(prefers-reduced-motion: reduce)').matches),[paused,setPaused]=useState(false),[speed,setSpeed]=useState(1),[sound,setSound]=useState(false),[light,setLight]=useState(!matchMedia('(prefers-color-scheme: dark)').matches),[info,setInfo]=useState(false),[hidden,setHidden]=useState(document.hidden);
+ const [active,setActive]=useState(0),[reduced,setReduced]=useState(matchMedia('(prefers-reduced-motion: reduce)').matches),[paused,setPaused]=useState(false),[speed,setSpeed]=useState(1),[sound,setSound]=useState(false),[light,setLight]=useState(!matchMedia('(prefers-color-scheme: dark)').matches),[info,setInfo]=useState(false),[hidden,setHidden]=useState(document.hidden),[webgl]=useState(canUseWebGL);
  const signal=useRef({p:0,turn:0,invalidate:null}),pointer=useRef({x:0,y:0}),root=useRef(),audio=useRef(),dialog=useRef();
  useEffect(()=>{document.documentElement.dataset.theme=light?'light':'dark'},[light]);
  useEffect(()=>{const mq=matchMedia('(prefers-reduced-motion: reduce)');const change=()=>setReduced(mq.matches);const visibility=()=>setHidden(document.hidden);mq.addEventListener('change',change);document.addEventListener('visibilitychange',visibility);return()=>{mq.removeEventListener('change',change);document.removeEventListener('visibilitychange',visibility)}},[]);
@@ -49,7 +60,7 @@ function App(){
  function go(i){document.getElementById(chapters[i].id)?.scrollIntoView({behavior:reduced?'instant':'smooth',block:'start'})}
  async function toggleSound(){try{if(!audio.current){const ctx=new AudioContext();audio.current=ctx;const gain=ctx.createGain();gain.gain.value=.018;gain.connect(ctx.destination);[110,164.81,220].forEach(f=>{const o=ctx.createOscillator();o.frequency.value=f;o.connect(gain);o.start()})}if(sound)await audio.current.suspend();else await audio.current.resume();setSound(!sound)}catch{setSound(false)}}
  return <><a className="skip" href="#threshold">Đến hành trình</a>
-  <div className="world" aria-hidden="true"><Boundary><Suspense fallback={<span className="loading">Đang mở không gian 3D…</span>}><Scene signal={signal} pointer={pointer} paused={paused} reduced={reduced} speed={speed} hidden={hidden}/></Suspense></Boundary></div>
+  <div className="world" aria-hidden="true">{webgl?<Boundary><Suspense fallback={<span className="loading">Đang mở không gian 3D…</span>}><Scene signal={signal} pointer={pointer} paused={paused} reduced={reduced} speed={speed} hidden={hidden}/></Suspense></Boundary>:<ModelFallback/>}</div>
   <header><a className="logo" href="#threshold" onClick={e=>{e.preventDefault();go(0)}} aria-label="Limen, về đầu hành trình">LIMEN</a><span className="header-note">An exhibition of<br/>impossible forms</span><div className="header-actions"><button onClick={()=>setInfo(true)}>Về triển lãm <ArrowUpRight/></button><button className="icon-button" aria-label={light?'Giao diện tối':'Giao diện sáng'} onClick={()=>setLight(!light)}>{light?<Moon/>:<Sun/>}</button></div></header>
   <nav className="chapter-nav" aria-label="Các chương triển lãm">{chapters.map((c,i)=><button key={c.id} onClick={()=>go(i)} aria-label={`Đến ${c.name}`} aria-current={active===i?'step':undefined}><span className="nav-label">{c.name}</span><span className="nav-tick"/></button>)}</nav>
   <main ref={root} id="journey">{chapters.map((c,i)=><section key={c.id} id={c.id} className={`chapter chapter-${i} ${c.side}`} aria-labelledby={`title-${c.id}`}><div className="chapter-word" aria-hidden="true">{c.en}</div><div className="chapter-inner"><div className="chapter-copy"><span className="eyebrow">{c.label}</span>{i===0?<h1 id={`title-${c.id}`}>{c.title.map(t=><span key={t}>{t}</span>)}</h1>:<h2 id={`title-${c.id}`}>{c.title.map(t=><span key={t}>{t}</span>)}</h2>}<p>{c.text}</p>{i===0?<button className="text-link" onClick={()=>go(1)}>Bắt đầu hành trình <ArrowRight/></button>:i===7?<button className="text-link" onClick={()=>go(0)}>Trải nghiệm lại <ArrowsClockwise/></button>:<span className="chapter-caption">{c.en} / {c.name}</span>}</div><p className="chapter-note">{c.note}</p>{i===7&&<div className="end-credit">Tạo nên từ hình học, ánh sáng và trí tưởng tượng.<br/>© 2026 LIMEN</div>}</div></section>)}</main>

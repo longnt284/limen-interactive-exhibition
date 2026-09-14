@@ -5,7 +5,7 @@ Khảo sát ngày 13/09/2026. Mã nguồn upstream nằm trong `repos/`, giữ n
 | Repository | Vai trò trong LIMEN |
 | --- | --- |
 | [three.js](https://github.com/mrdoob/three.js) | Runtime dựng hình, vật liệu kim loại, instancing |
-| [drei](https://github.com/pmndrs/drei) | Runtime OrbitControls, Environment và Lightformer |
+| [drei](https://github.com/pmndrs/drei) | Tham khảo helpers; đã bỏ khỏi runtime để tăng tương thích GPU |
 | [GSAP](https://github.com/greensock/GSAP) | Runtime chuyển tác phẩm và chữ |
 | [Animate.css](https://github.com/animate-css/animate.css) | Thư viện hiệu ứng CSS tham khảo, chỉ nhập module nhỏ |
 | [Vanta](https://github.com/tengbao/vanta) | Tham khảo nền WebGL tương tác; không khởi tạo thêm renderer |
