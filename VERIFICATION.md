@@ -8,7 +8,7 @@
 - Màn cuối: Dư âm hiển thị, có nút Trải nghiệm lại, thanh tiến trình 08 / 08.
 - Console production: kiểm tra cuối trong trình duyệt, không có lỗi ghi nhận.
 - Domain Vercel công khai đã được kiểm tra trên desktop và mobile; model hiện đúng. Deployment URL có hash yêu cầu Vercel Authentication, domain production không yêu cầu đăng nhập.
-- Khả năng tương thích: Three.js r162 hỗ trợ WebGL 1/2; bỏ Environment/Lightformer và `powerPreference: high-performance`; thêm kiểm tra WebGL, xử lý context loss và fallback CSS.
+- Khả năng tương thích: Three.js r162 hỗ trợ WebGL 1/2; bỏ Environment/Lightformer và `powerPreference: high-performance`; để Canvas trực tiếp thương lượng context, xử lý context loss và fallback CSS.
 - Không đo FPS trên thiết bị vật lý hoặc điểm Lighthouse. Lần cài Lighthouse trước bị lỗi thiếu bộ nhớ Windows; không suy diễn điểm hiệu năng.
 
 Bản trước lưu ở archive/single-gallery. 12 repo tiếp tục giữ trong references/repos; Hyperframes còn một số media LFS dưới dạng pointer như đã ghi nhận ở bản trước.

@@ -24,7 +24,7 @@ npm run dev
 
 Một canvas xuyên suốt, một InstancedMesh với 180 phần tử và geometry/material dùng chung. Các trạng thái hình học tính trước, vị trí/quaternion/tỉ lệ nội suy theo tiến độ ScrollTrigger. Không tải mô hình giữa các chương, không chặn wheel/touch, không đặt React state trong vòng render. Giới hạn DPR 1.25 và dùng hệ đèn trực tiếp để giảm shader/render-target. Dùng render theo yêu cầu khi dừng, giảm motion hoặc tab ẩn.
 
-Three.js được khóa ở r162 để hỗ trợ cả WebGL 1 và WebGL 2. Trước khi tải scene, ứng dụng kiểm tra khả năng tạo context; nếu WebGL không khả dụng hoặc context bị mất, giao diện dùng một hình thái CSS thay thế thay vì để trống màn hình.
+Three.js được khóa ở r162 để hỗ trợ cả WebGL 1 và WebGL 2. Canvas tự chọn context phù hợp; nếu WebGL thực sự không khả dụng hoặc context bị mất, giao diện dùng một hình thái CSS thay thế thay vì để trống màn hình.
 
 - `src/chapters.js`: nội dung tám chương.
 - `src/main.jsx`: bố cục, điều khiển và ScrollTrigger.
