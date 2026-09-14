@@ -1,0 +1,74 @@
+[
+  {
+    "name": "adrianhajdin__project_3D_developer_portfolio",
+    "url": "https://github.com/adrianhajdin/project_3D_developer_portfolio.git",
+    "commit": "9985e4bf4ce35dfbc0b3c0e90d4d37dc3c67b2d7",
+    "note": "Shallow clone"
+  },
+  {
+    "name": "aframevr__aframe",
+    "url": "https://github.com/aframevr/aframe.git",
+    "commit": "022bcc5f6eef09ff60d3f2110604c78cae0cd5b1",
+    "note": "Shallow clone"
+  },
+  {
+    "name": "animate-css__animate.css",
+    "url": "https://github.com/animate-css/animate.css.git",
+    "commit": "3f8ab233dbbd9d2fe577528d2296382954be3d1a",
+    "note": "Shallow clone"
+  },
+  {
+    "name": "cathrynlavery__diagram-design",
+    "url": "https://github.com/cathrynlavery/diagram-design.git",
+    "commit": "8d8b2993ee2256ee7dfc0eeb3b5713aba3b60792",
+    "note": "Shallow clone"
+  },
+  {
+    "name": "greensock__GSAP",
+    "url": "https://github.com/greensock/GSAP.git",
+    "commit": "13e2b790546426a1a2e0e9b409f3f8dc6d6611f2",
+    "note": "Shallow clone"
+  },
+  {
+    "name": "greensock__gsap-skills",
+    "url": "https://github.com/greensock/gsap-skills.git",
+    "commit": "aed9cfd3277740755f6bfc1155c7aa645403b760",
+    "note": "Shallow clone"
+  },
+  {
+    "name": "heygen-com__hyperframes",
+    "url": "https://github.com/heygen-com/hyperframes.git",
+    "commit": "fdf9ffac953d9d18329907d6956faa58c73ad489",
+    "note": "Source checked out; some large LFS media retained as pointers"
+  },
+  {
+    "name": "img2threejs__img2threejs",
+    "url": "https://github.com/img2threejs/img2threejs.git",
+    "commit": "6e60b5e22419464b4853e01ddb6c0e6f6659a733",
+    "note": "Shallow clone"
+  },
+  {
+    "name": "mrdoob__three.js",
+    "url": "https://github.com/mrdoob/three.js.git",
+    "commit": "e45cbf7ff66df079cfa39d9699ccb42729934be1",
+    "note": "Shallow clone"
+  },
+  {
+    "name": "pmndrs__drei",
+    "url": "https://github.com/pmndrs/drei.git",
+    "commit": "ffa15b956e320391b0e86084cb58c8da0445abe3",
+    "note": "Shallow clone"
+  },
+  {
+    "name": "tengbao__vanta",
+    "url": "https://github.com/tengbao/vanta.git",
+    "commit": "f8b351906688b56f0fc744e53bde81fc3c56f150",
+    "note": "Shallow clone"
+  },
+  {
+    "name": "troisjs__trois",
+    "url": "https://github.com/troisjs/trois.git",
+    "commit": "a1b12398091061b34d872eb0191b22d252b43c89",
+    "note": "Shallow clone"
+  }
+]
