@@ -1,13 +1,13 @@
 # Thư viện tham khảo LIMEN
 
-Khảo sát ngày 13/09/2026. Mã nguồn upstream nằm trong `repos/`, giữ nguyên giấy phép từng dự án. Không chạy script từ các repo tham khảo.
+Khảo sát ngày 13/09/2026, clone lại ngày 16/09/2026. Mã nguồn upstream nằm trong `repos/`, giữ nguyên giấy phép từng dự án. Không chạy script từ các repo tham khảo.
 
 | Repository | Vai trò trong LIMEN |
 | --- | --- |
 | [three.js](https://github.com/mrdoob/three.js) | Runtime dựng hình, vật liệu kim loại, instancing |
 | [drei](https://github.com/pmndrs/drei) | Tham khảo helpers; đã bỏ khỏi runtime để tăng tương thích GPU |
 | [GSAP](https://github.com/greensock/GSAP) | Runtime chuyển tác phẩm và chữ |
-| [Animate.css](https://github.com/animate-css/animate.css) | Thư viện hiệu ứng CSS tham khảo, chỉ nhập module nhỏ |
+| [Animate.css](https://github.com/animate-css/animate.css) | Chỉ tham khảo; đã gỡ khỏi dependencies vì không nơi nào import. Chuyển động chữ do GSAP đảm nhiệm |
 | [Vanta](https://github.com/tengbao/vanta) | Tham khảo nền WebGL tương tác; không khởi tạo thêm renderer |
 | [3D developer portfolio](https://github.com/adrianhajdin/project_3D_developer_portfolio) | Tham khảo tổ chức React và canvas 3D |
 | [img2threejs](https://github.com/img2threejs/img2threejs) | Tham khảo hướng hình học procedural; tác phẩm hiện tại do dự án tự tạo |
@@ -15,7 +15,7 @@ Khảo sát ngày 13/09/2026. Mã nguồn upstream nằm trong `repos/`, giữ n
 | [diagram-design](https://github.com/cathrynlavery/diagram-design) | Lưu cho thiết kế sơ đồ biên tập |
 | [Hyperframes](https://github.com/heygen-com/hyperframes) | Lưu cho khả năng xuất video HTML trong tương lai |
 | [Trois](https://github.com/troisjs/trois) | Lưu cho nghiên cứu phiên bản Vue; không trộn Vue vào React |
-| [GSAP skills](https://github.com/greensock/gsap-skills) | Tài liệu animation chính thức để tra cứu |
+| [GSAP skills](https://github.com/greensock/gsap-skills) | Tài liệu animation chính thức. Bản tám chương theo `gsap-scrolltrigger` (refreshPriority, refresh sau khi font tải, một ScrollTrigger cho tiến độ), `gsap-react` (`gsap.context` + `ctx.revert()` trong cleanup) và `gsap-performance` (`quickTo` cho giá trị cập nhật liên tục, chỉ animate transform và opacity) |
 
 ## Nghiên cứu thiết kế
 
@@ -25,6 +25,6 @@ Khảo sát ngày 13/09/2026. Mã nguồn upstream nằm trong `repos/`, giữ n
 
 ## Quyết định triển khai
 
-Một canvas, không ảnh stock hoặc HDR tải từ CDN, không tài khoản hay API key. Ánh sáng studio được tạo cục bộ bằng Lightformer. Continuum dùng 180 instance chung geometry/material để hạn chế draw call. React Three Fiber 9 dùng React 19.2 vì peer dependency của phiên bản hiện tại không nhận React 19.3. Các framework thay thế được lưu tham khảo thay vì đưa cùng lúc vào bundle.
+Một canvas, không ảnh stock hoặc HDR tải từ CDN, không tài khoản hay API key. Ánh sáng dùng đèn trực tiếp, không Environment/Lightformer, để giữ tương thích GPU. Mỗi chương là một `InstancedMesh` 180 phần tử với hình học riêng, dùng chung một material; chỉ tối đa hai khối được vẽ cùng lúc nên số draw call không tăng theo số chương. Nền và bụi là shader tự viết, không postprocessing và không render target. React Three Fiber 9 dùng React 19.2 vì peer dependency của phiên bản hiện tại không nhận React 19.3. Các framework thay thế được lưu tham khảo thay vì đưa cùng lúc vào bundle.
 
 Giấy phép upstream vẫn áp dụng dù mục đích triển lãm phi thương mại. Không tuyên bố toàn bộ các thư viện có chung giấy phép.
