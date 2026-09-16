@@ -20,7 +20,7 @@
   {
     "name": "cathrynlavery__diagram-design",
     "url": "https://github.com/cathrynlavery/diagram-design.git",
-    "commit": "8d8b2993ee2256ee7dfc0eeb3b5713aba3b60792",
+    "commit": "9874ad73813715fc36875e45afd9cd94c68f3c3f",
     "note": "Shallow clone"
   },
   {
@@ -38,8 +38,8 @@
   {
     "name": "heygen-com__hyperframes",
     "url": "https://github.com/heygen-com/hyperframes.git",
-    "commit": "fdf9ffac953d9d18329907d6956faa58c73ad489",
-    "note": "Source checked out; some large LFS media retained as pointers"
+    "commit": "08d48ab7539e3a21facbe005c0610f2dbc8bf5a5",
+    "note": "Source checked out; large LFS media retained as pointers"
   },
   {
     "name": "img2threejs__img2threejs",
@@ -50,7 +50,7 @@
   {
     "name": "mrdoob__three.js",
     "url": "https://github.com/mrdoob/three.js.git",
-    "commit": "e45cbf7ff66df079cfa39d9699ccb42729934be1",
+    "commit": "eabc262db760c5e85bd890a6dc627ba14e70e8c3",
     "note": "Shallow clone"
   },
   {
