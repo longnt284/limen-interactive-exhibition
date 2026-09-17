@@ -23,11 +23,20 @@ import './style.css';
 gsap.registerPlugin(ScrollTrigger);
 ScrollTrigger.config({ignoreMobileResize:true});
 const Scene=lazy(()=>import('./Scene'));
+// h,s,l,alpha của chữ nền cho mỗi giao diện; TINT là độ lệch hue/lum của tám chương, khớp với bảng trạng thái trong Scene.
+const DISPLAY={dark:[118,10,49,.17],light:[105,15,47,.15]};
+const TINT=[[0,0],[3.6,2],[-5.4,.8],[-10.8,-1],[7.9,3],[-14.4,-2],[2.9,1],[0,5]];
 class Boundary extends Component{state={error:false};static getDerivedStateFromError(){return{error:true}}render(){return this.state.error?<div className="fallback" role="status">Cảnh 3D không khả dụng trên trình duyệt này. Hành trình nội dung vẫn tiếp tục.</div>:this.props.children}}
 function App(){
  const [active,setActive]=useState(0),[reduced,setReduced]=useState(matchMedia('(prefers-reduced-motion: reduce)').matches),[paused,setPaused]=useState(false),[speed,setSpeed]=useState(1),[sound,setSound]=useState(false),[light,setLight]=useState(!matchMedia('(prefers-color-scheme: dark)').matches),[info,setInfo]=useState(false),[hidden,setHidden]=useState(document.hidden);
- const signal=useRef({p:0,smooth:0,v:0,turn:0,intro:0,energy:0,focus:0,focusY:.52,invalidate:null}),pointer=useRef({x:0,y:0}),root=useRef(),audio=useRef(),dialog=useRef(),rail=useRef();
+ const signal=useRef({p:0,smooth:0,v:0,turn:0,invalidate:null}),pointer=useRef({x:0,y:0}),root=useRef(),audio=useRef(),dialog=useRef(),rail=useRef();
  useEffect(()=>{document.documentElement.dataset.theme=light?'light':'dark'},[light]);
+ // Giao diện đọc cùng nhịp màu với cảnh 3D: chữ nền khổng lồ và thanh địa chỉ trôi theo tông của chương đang mở.
+ useEffect(()=>{
+  const [h,s,l,alpha]=DISPLAY[light?'light':'dark'],[dh,dl]=TINT[active];
+  document.documentElement.style.setProperty('--display',`hsl(${h+dh} ${s}% ${l+dl}% / ${alpha})`);
+  document.querySelector('meta[name=theme-color]')?.setAttribute('content',light?'#dce3db':'#111c1b');
+ },[active,light]);
  useEffect(()=>{const mq=matchMedia('(prefers-reduced-motion: reduce)');const change=()=>setReduced(mq.matches);const visibility=()=>setHidden(document.hidden);mq.addEventListener('change',change);document.addEventListener('visibilitychange',visibility);return()=>{mq.removeEventListener('change',change);document.removeEventListener('visibilitychange',visibility)}},[]);
  useEffect(()=>{const move=e=>{pointer.current.x=e.clientX/innerWidth*2-1;pointer.current.y=e.clientY/innerHeight*2-1};window.addEventListener('pointermove',move,{passive:true});return()=>window.removeEventListener('pointermove',move)},[]);
  // Fonts change text metrics, so trigger positions are only final once they land.
