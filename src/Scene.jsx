@@ -23,18 +23,25 @@ const PALETTE={
 // 0 cx 1 cy 2 cz | 3 tx 4 ty 5 tz | 6 fov | 7 kx 8 ky 9 kz | 10 key 11 fill 12 ambient 13 rim
 // 14 fogBack 15 fogDepth | 16 hue 17 sat 18 lum 19 glow | 20 emissive
 const SN=21;
+// Cột 14-15 (biên sương) và 18-19 (độ sáng nền, cường độ quầng) mang đường cong cảm xúc của hành trình:
+// khép và tối ở Ngưỡng cửa, mở dần, rộng và sáng nhất ở Phân rã, rồi lắng lại ở Dư âm.
 const STATES=[
- [ 0.00, 0.05, 8.40,  0.00, 0.00, 0.00, 42,  4, 6, 5, 1.00,1.00,1.00,1.00, 4.2, 9.0,  0.000,1.00, 0.000,1.00,1.00],
- [-0.55, 0.12, 7.90,  0.20, 0.00,-0.30, 44,  6, 3, 4, 1.12,0.82,0.94,1.18, 3.8, 8.4,  0.010,1.06, 0.020,1.10,1.20],
- [ 0.30, 0.35,10.40,  0.00, 0.00, 0.00, 40,  2, 7, 6, 0.92,1.10,1.02,1.00, 5.2,12.6, -0.015,0.96, 0.008,0.92,1.10],
- [-0.20,-0.30, 7.00,  0.00,-0.18, 0.00, 48, -3, 4, 6, 1.02,1.22,1.06,0.92, 3.2, 7.6, -0.030,1.02,-0.010,1.00,1.00],
- [ 0.25, 1.05, 9.00,  0.00, 0.35, 0.00, 43,  3, 8, 3, 1.24,0.90,1.12,1.14, 4.4,10.5,  0.022,1.10, 0.030,1.16,1.30],
- [ 0.00, 0.25, 8.80,  0.00, 0.00, 0.00, 46,  5, 2, 6, 0.86,1.32,0.96,1.36, 3.6, 7.8, -0.040,0.90,-0.020,0.88,1.50],
- [-0.35, 0.20,10.40,  0.00, 0.00, 0.00, 40, -5, 5, 4, 1.06,1.02,1.00,1.10, 5.6,15.0,  0.008,1.04, 0.010,1.02,1.20],
- [ 0.00, 0.10, 8.90,  0.00, 0.00, 0.00, 41,  0, 4, 7, 1.00,1.06,1.18,0.94, 5.0,13.0,  0.000,0.86, 0.050,1.22,0.90],
+ [ 0.00, 0.05, 8.40,  0.00, 0.00, 0.00, 42,  4, 6, 5, 1.00,1.00,1.00,1.00, 3.6, 7.4,  0.000,1.00,-0.045,0.72,1.00],
+ [-0.55, 0.12, 7.90,  0.20, 0.00,-0.30, 44,  6, 3, 4, 1.12,0.82,0.94,1.18, 3.8, 8.4,  0.010,1.06,-0.020,0.92,1.20],
+ [ 0.30, 0.35,10.40,  0.00, 0.00, 0.00, 40,  2, 7, 6, 0.92,1.10,1.02,1.00, 5.2,12.6, -0.015,0.96,-0.010,0.88,1.10],
+ [-0.20,-0.30, 7.00,  0.00,-0.18, 0.00, 48, -3, 4, 6, 1.02,1.22,1.06,0.92, 3.2, 7.6, -0.030,1.02,-0.005,1.00,1.00],
+ [ 0.25, 1.05, 9.00,  0.00, 0.35, 0.00, 43,  3, 8, 3, 1.24,0.90,1.12,1.14, 4.4,10.5,  0.022,1.10, 0.030,1.20,1.30],
+ [ 0.00, 0.25, 8.80,  0.00, 0.00, 0.00, 46,  5, 2, 6, 0.86,1.32,0.96,1.36, 4.6,11.5, -0.040,0.90, 0.012,1.34,1.50],
+ [-0.35, 0.20,10.40,  0.00, 0.00, 0.00, 40, -5, 5, 4, 1.06,1.02,1.00,1.10, 5.6,15.0,  0.008,1.04, 0.006,1.05,1.20],
+ [ 0.00, 0.10, 8.90,  0.00, 0.00, 0.00, 41,  0, 4, 7, 1.00,1.06,1.18,0.94, 5.0,13.0,  0.000,0.86, 0.028,0.86,0.90],
 ];
 // Bố cục: chữ bên nào thì khối dồn về phía đối diện. Hai chương căn đáy được nâng lên để không đè chữ.
+// DEMOTE kéo khối 3D về gần trục giữa, thu nhỏ và đẩy lùi vào chiều sâu. Từ bản này khối 3D là kiến trúc nền
+// của thế giới, còn tác phẩm SVG ở lớp sân khấu mới là chủ thể thị giác. Khối vẫn biến hình liên tục như cũ.
 const SHIFT=[1.65,-1.75,1.6,-1.7,1.6,0,-1.7,.5],LIFT=[0,0,0,0,-.1,.35,0,.65];
+// shift âm: khối 3D lùi về phía đang đặt chữ, còn tác phẩm SVG chiếm phía đối diện.
+// Hai chủ thể không bao giờ chồng lên nhau, và khối 3D trở thành chiều sâu nằm sau dòng tiêu đề.
+const DEMOTE={shift:-.62,scale:.72,narrowScale:.46,depth:-1.2,rim:.78,emissive:.8};
 const _m=new THREE.Matrix4(),_up=new THREE.Vector3(0,1,0),_t=new THREE.Vector3(),_v=new THREE.Vector3(),_yA=new THREE.Vector3(0,1,0);
 // Object3D.lookAt đọc matrixWorld, mà matrixWorld của một Object3D rời luôn là ma trận đơn vị nên vị trí đọc ra là gốc toạ độ.
 // Tự dựng quaternion để mặt phẳng thật sự hướng vào tâm.
@@ -227,7 +234,7 @@ void main(){
   col+=uGlow*pow(rings,3.0)*0.075*uL2.z;
  }
  col=mix(col,mix(col,uTop,0.20)+uGlow*0.04,uL2.w);
- col*=1.0-0.4*smoothstep(0.32,1.2,length((uv-0.5)*vec2(uAspect,1.0)));
+ col*=1.0-0.52*smoothstep(0.28,1.2,length((uv-0.5)*vec2(uAspect,1.0)));
  col+=(hash(uv*vec2(1733.0,1097.0)+fract(uTime)*19.0)-0.5)*0.009;
  gl_FragColor=vec4(col,1.0);
  #include <tonemapping_fragment>
@@ -288,7 +295,7 @@ void main(){
 }`;
 function Atmosphere({theme,env,still,low}){
  const {viewport}=useThree();
- const count=low?260:520;
+ const count=low?190:400;
  const geo=useMemo(()=>{
   const g=new THREE.BufferGeometry(),pos=new Float32Array(count*3),seed=new Float32Array(count);
   for(let i=0;i<count;i++){pos[i*3]=(Math.random()-.5)*16;pos[i*3+1]=(Math.random()-.5)*11;pos[i*3+2]=(Math.random()-.5)*9-1;seed[i]=Math.random()}
@@ -372,10 +379,10 @@ function Forms({signal,paused,reduced,speed,pointer,theme,still,env,low}){
    mesh.instanceMatrix.needsUpdate=true;
   }
   const narrow=size.width<700,mix=smoothstep(frac,0,1),slow=smootherstep(frac,0,1);
-  const wanted=narrow?0:lerp(SHIFT[a],SHIFT[b],mix);
+  const wanted=narrow?0:lerp(SHIFT[a],SHIFT[b],mix)*DEMOTE.shift;
   shift.current=still?wanted:damp(shift.current,wanted,6,dt);
-  group.current.position.set(shift.current,(narrow?.85:0)+lerp(LIFT[a],LIFT[b],mix),0);
-  group.current.scale.setScalar((narrow?.6:.86)*lerp(.82,1,ease));
+  group.current.position.set(shift.current,(narrow?.55:0)+lerp(LIFT[a],LIFT[b],mix),DEMOTE.depth);
+  group.current.scale.setScalar((narrow?DEMOTE.narrowScale:DEMOTE.scale)*lerp(.82,1,ease));
   group.current.rotation.set(.2+pointer.current.y*.12*live,
    -.28+(reduced?a:p)*.3+time.current*.07+s.turn+spin.current,
    -.16+pointer.current.x*.1*live+spin.current*.25);
@@ -395,8 +402,8 @@ function Forms({signal,paused,reduced,speed,pointer,theme,still,env,low}){
   key.current.intensity=theme.key*cur[10];
   fill.current.intensity=theme.fill*cur[11];
   amb.current.intensity=theme.ambient*cur[12];
-  for(const m of materials)m.userData.rim.uRimStrength.value=theme.rimStrength*m.userData.rim.uRimBase*cur[13];
-  materials[2].emissiveIntensity=theme.emissive*cur[20];
+  for(const m of materials)m.userData.rim.uRimStrength.value=theme.rimStrength*m.userData.rim.uRimBase*cur[13]*DEMOTE.rim;
+  materials[2].emissiveIntensity=theme.emissive*cur[20]*DEMOTE.emissive;
   const sat=(cur[17]-1)*.25;
   env.top.copy(base.top).offsetHSL(cur[16],sat,cur[18]);
   env.bottom.copy(base.bottom).offsetHSL(cur[16],sat,cur[18]*.7);
@@ -413,7 +420,7 @@ function Forms({signal,paused,reduced,speed,pointer,theme,still,env,low}){
   if(low){env.l1[1]*=.6;env.l1[2]*=.7}
   env.vel=vel.current;
   env.energy=vel.current+burst*.35;
-  env.focus=narrow?0:shift.current/4.2;
+  env.focus=narrow?0:shift.current/(4.2*DEMOTE.shift);
   env.focusY=narrow?.68:.52;
  });
  return <>

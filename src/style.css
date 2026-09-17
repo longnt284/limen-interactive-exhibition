@@ -9,3 +9,55 @@ html[data-theme=light]{--display:#6f8a6526}
 .nav-rail{display:none}
 @media(min-width:901px){.nav-rail{display:block;position:absolute;right:-13px;top:8px;bottom:8px;width:1px;background:var(--line)}.nav-rail-fill{position:absolute;inset:0;background:var(--accent);transform:scaleY(0);transform-origin:top center;will-change:transform}}
 
+/* Mặt nạ chữ tiêu đề: dòng trượt ra từ sau một khuôn cắt đúng chiều cao dòng.
+   Đệm .18em giữ dấu tiếng Việt khỏi bị cắt; lề âm .36em bù lại nên nhịp dòng không đổi. */
+.chapter h1 .line,.chapter h2 .line{overflow:hidden;padding:.18em .12em;margin:0 -.12em -.36em}
+.chapter h1,.chapter h2{margin-top:calc(28px - .18em);margin-bottom:calc(24px + .18em)}
+.chapter-word{transform-origin:0 50%;will-change:transform}
+/* Vùng an toàn trên cùng: chữ của chương đi qua dưới header phải bị che hẳn, không lấp ló cạnh logo. */
+header{background:linear-gradient(var(--bg) 46%,transparent)}
+
+/* Sân khấu mixed-media 2.5D. Nằm giữa lớp WebGL (z1, trước nó trong DOM) và lớp chữ (z2). */
+.stage{position:fixed;inset:0;z-index:1;pointer-events:none;overflow:hidden;contain:layout paint style}
+.stage-scene{position:absolute;inset:0;opacity:0;visibility:hidden;contain:layout paint}
+.stage-scene.is-live{visibility:visible}
+.plate{position:absolute;width:var(--w);height:var(--w);margin:calc(var(--w)/-2) 0 0 calc(var(--w)/-2)}
+.plate-far,.plate-mid{--w:var(--s);left:var(--x);top:var(--y)}
+.plate-near{--w:var(--ns);left:var(--nx);top:var(--ny)}
+.plate-mid{transform:rotate(var(--r))}
+.plate-window{width:100%;height:100%;overflow:hidden}
+.plate-near .plate-window{transform:rotate(var(--nr));border:1px solid var(--line)}
+.plate-art,.art{display:block;width:100%;height:100%}
+/* Mặt nạ mềm: tác phẩm tan vào nền thay vì đóng khung thành một tấm thẻ chữ nhật.
+   Mép nhạt dần cũng là chỗ đặt chú thích nhỏ, nên chữ luôn nằm trên vùng tối nhất của tác phẩm. */
+.plate-mid .plate-window{-webkit-mask-image:radial-gradient(ellipse 70% 70% at 50% 47%,#000 26%,transparent 80%);mask-image:radial-gradient(ellipse 70% 70% at 50% 47%,#000 26%,transparent 80%)}
+.plate-far{opacity:.34}
+.plate-far .plate-art{transform:scale(2.4)}
+.stage-scene.is-live .plate-far .plate-art,.stage-scene.is-live .plate-window,.stage-scene.is-live .plate-mid .plate-art{will-change:transform}
+/* Màn che chỉ phủ đúng nửa khung có chữ. Phần còn lại không vẽ, nên mỗi khung hình bớt một lượt tô toàn màn hình. */
+.scrim{position:absolute;inset:var(--st,0) var(--sr,0) var(--sb,0) var(--sl,0);background:linear-gradient(var(--dir),var(--scrim),transparent 92%)}
+
+/* Lớp phim: vân hạt phủ lên cả chữ lẫn hình để tám chương đọc ra cùng một chất liệu.
+   Vignette đã nằm sẵn trong shader nền nên không lặp lại ở đây. */
+.veil{position:fixed;inset:0;z-index:2;pointer-events:none;overflow:hidden}
+.grain{position:absolute;inset:-6%;opacity:.055;will-change:transform;background-size:160px 160px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E")}
+@media(prefers-reduced-motion:no-preference){.grain{animation:grain 1.1s steps(1,end) infinite}}
+@keyframes grain{0%{transform:translate(0,0)}20%{transform:translate(-5%,3%)}40%{transform:translate(4%,-4%)}60%{transform:translate(-3%,-2%)}80%{transform:translate(4%,4%)}}
+
+:root{--scrim:#111c1bd6}
+html[data-theme=light]{--scrim:#dce3dbe0}
+html[data-theme=light] .grain{opacity:.075;filter:invert(1)}
+
+/* Giảm chuyển động: sân khấu không chạy theo cuộn nữa, chỉ đổi dứt điểm theo chương đang mở. */
+html[data-motion=reduced] .stage-scene{opacity:0;transition:opacity .45s ease}
+html[data-motion=reduced] .stage-scene.is-now{opacity:var(--pow,1)}
+
+@media(max-width:699px){
+ .plate-far,.plate-mid{left:50%;top:31%;--w:78vmin}
+ .plate-mid{transform:none}
+ .plate-near{display:none}
+ .plate-far{opacity:.34}
+ .scrim{inset:38% 0 0 0;background:linear-gradient(to top,var(--scrim),transparent 92%)}
+ .grain{opacity:.04;animation:none}
+}
+

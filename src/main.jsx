@@ -13,6 +13,8 @@ import {ArrowsClockwise} from '@phosphor-icons/react/dist/csr/ArrowsClockwise';
 import gsap from 'gsap';
 import {ScrollTrigger} from 'gsap/ScrollTrigger';
 import {chapters} from './chapters';
+import Stage from './Stage';
+import {ARC} from './artwork';
 import '@fontsource/manrope/latin-400.css';
 import '@fontsource/manrope/latin-500.css';
 import '@fontsource/manrope/latin-600.css';
@@ -23,17 +25,26 @@ import './style.css';
 gsap.registerPlugin(ScrollTrigger);
 ScrollTrigger.config({ignoreMobileResize:true});
 const Scene=lazy(()=>import('./Scene'));
-// h,s,l,alpha của chữ nền cho mỗi giao diện; TINT là độ lệch hue/lum của tám chương, khớp với bảng trạng thái trong Scene.
+// h,s,l,alpha của chữ nền cho mỗi giao diện. Độ lệch hue/lum của tám chương lấy từ ARC trong artwork,
+// nên chữ nền, tác phẩm SVG và tông cảnh 3D đi chung một cung màu duy nhất.
 const DISPLAY={dark:[118,10,49,.17],light:[105,15,47,.15]};
-const TINT=[[0,0],[3.6,2],[-5.4,.8],[-10.8,-1],[7.9,3],[-14.4,-2],[2.9,1],[0,5]];
 class Boundary extends Component{state={error:false};static getDerivedStateFromError(){return{error:true}}render(){return this.state.error?<div className="fallback" role="status">Cảnh 3D không khả dụng trên trình duyệt này. Hành trình nội dung vẫn tiếp tục.</div>:this.props.children}}
 function App(){
  const [active,setActive]=useState(0),[reduced,setReduced]=useState(matchMedia('(prefers-reduced-motion: reduce)').matches),[paused,setPaused]=useState(false),[speed,setSpeed]=useState(1),[sound,setSound]=useState(false),[light,setLight]=useState(!matchMedia('(prefers-color-scheme: dark)').matches),[info,setInfo]=useState(false),[hidden,setHidden]=useState(document.hidden);
  const signal=useRef({p:0,smooth:0,v:0,turn:0,invalidate:null}),pointer=useRef({x:0,y:0}),root=useRef(),audio=useRef(),dialog=useRef(),rail=useRef();
  useEffect(()=>{document.documentElement.dataset.theme=light?'light':'dark'},[light]);
+ // Chế độ giảm chuyển động phải đọc được từ CSS, vì sân khấu 2.5D khi đó hiển thị tĩnh theo chương thay vì theo cuộn.
+ useEffect(()=>{document.documentElement.dataset.motion=reduced?'reduced':'full'},[reduced]);
+ // Chỉ chương đang mở và hai chương kề nó được vẽ. Các chương còn lại ẩn hẳn nên trình duyệt bỏ qua khâu vẽ.
+ useEffect(()=>{
+  document.querySelectorAll('.stage-scene').forEach((el,i)=>{
+   el.classList.toggle('is-live',Math.abs(i-active)<=1);
+   el.classList.toggle('is-now',i===active);
+  });
+ },[active]);
  // Giao diện đọc cùng nhịp màu với cảnh 3D: chữ nền khổng lồ và thanh địa chỉ trôi theo tông của chương đang mở.
  useEffect(()=>{
-  const [h,s,l,alpha]=DISPLAY[light?'light':'dark'],[dh,dl]=TINT[active];
+  const [h,s,l,alpha]=DISPLAY[light?'light':'dark'],[dh,dl]=ARC[active];
   document.documentElement.style.setProperty('--display',`hsl(${h+dh} ${s}% ${l+dl}% / ${alpha})`);
   document.querySelector('meta[name=theme-color]')?.setAttribute('content',light?'#dce3db':'#111c1b');
  },[active,light]);
@@ -68,25 +79,58 @@ function App(){
    sections.forEach((section,i)=>{
     ScrollTrigger.create({trigger:section,start:'top 50%',end:'bottom 50%',onToggle:s=>{if(s.isActive)setActive(i)}});
     if(reduced)return;
-    const lines=section.querySelectorAll('.chapter-copy h1 .line,.chapter-copy h2 .line');
+    // Chữ tiêu đề trượt ra từ sau một mặt nạ cắt đúng chiều cao dòng, thay vì mờ dần và nghiêng trong không gian.
+    const lines=section.querySelectorAll('.chapter-copy h1 .line-in,.chapter-copy h2 .line-in');
     const detail=section.querySelectorAll('.chapter-copy .eyebrow,.chapter-copy p,.chapter-copy .text-link,.chapter-copy .chapter-caption');
     const word=section.querySelector('.chapter-word');
     if(i>0){
-     gsap.fromTo(lines,{yPercent:46,opacity:0,rotationX:-32},{yPercent:0,opacity:1,rotationX:0,transformPerspective:560,transformOrigin:'50% 100%',stagger:.13,ease:'none',
-      scrollTrigger:{trigger:section,start:'top 82%',end:'top 26%',scrub:.4}});
+     gsap.fromTo(lines,{yPercent:132},{yPercent:0,stagger:.12,ease:'none',
+      scrollTrigger:{trigger:section,start:'top 82%',end:'top 30%',scrub:.4}});
      gsap.fromTo(detail,{y:34,opacity:0},{y:0,opacity:1,stagger:.1,ease:'none',
       scrollTrigger:{trigger:section,start:'top 74%',end:'top 22%',scrub:.4}});
     }
-    gsap.to(word,{yPercent:-26,ease:'none',scrollTrigger:{trigger:section,start:'top bottom',end:'bottom top',scrub:true}});
+    // Chữ nền khổng lồ trôi chậm nhất và thu nhẹ lại: nó là lớp sâu nhất của khung hình, không phải một nhãn dán.
+    gsap.fromTo(word,{yPercent:14,scale:1.07},{yPercent:-26,scale:.97,ease:'none',
+     scrollTrigger:{trigger:section,start:'top bottom',end:'bottom top',scrub:true}});
    });
   },root);
+  return()=>ctx.revert();
+ },[reduced]);
+ // Chuyển cảnh không gian. Mỗi chương là một lần ống kính đi xuyên qua tác phẩm:
+ // tác phẩm chương trước phóng to rồi tan, tác phẩm chương này mở từ lát cắt hẹp ra tràn khung rồi vượt qua người xem,
+ // mảnh của chương sau trôi ngược nhanh nhất. Ba mặt phẳng chạy khác tốc độ nên khung hình có chiều sâu như máy quay.
+ useEffect(()=>{
+  if(reduced)return;
+  const scenes=gsap.utils.toArray('.stage-scene'),sections=gsap.utils.toArray('.chapter');
+  if(!scenes.length||scenes.length!==sections.length)return;
+  const ctx=gsap.context(()=>{
+   scenes.forEach((scene,i)=>{
+    const far=scene.querySelector('.plate-far .plate-art'),win=scene.querySelector('.plate-mid .plate-window'),
+     art=scene.querySelector('.plate-mid .plate-art'),near=scene.querySelector('.plate-near');
+    // Cửa sổ co giãn không đều còn tác phẩm bên trong giãn nghịch đúng bằng đó, nên tỉ lệ tác phẩm không bao giờ méo.
+    // Cái đổi là khuôn cắt: từ một dải hẹp mở dần thành khung đầy.
+    // --pow là độ hiện diện tối đa của chương, khai báo cùng chỗ với bố cục trong Stage.
+    // autoAlpha chứ không phải opacity: cảnh mờ hẳn thì GSAP đặt visibility hidden, trình duyệt bỏ luôn khâu vẽ.
+    // Ở bất kỳ vị trí cuộn nào cũng chỉ còn tối đa hai cảnh phải dựng hình.
+    const open=[.78,.4],over=1.08,pow=parseFloat(getComputedStyle(scene).getPropertyValue('--pow'))||1;
+    gsap.timeline({scrollTrigger:{trigger:sections[i],start:'top bottom',end:'bottom top',scrub:.55}})
+     .fromTo(scene,{autoAlpha:0},{autoAlpha:pow,duration:.26,ease:'none'},0)
+     .to(scene,{autoAlpha:0,duration:.32,ease:'none'},.68)
+     .fromTo(far,{scale:3,yPercent:7,opacity:.5},{scale:2.3,yPercent:-9,opacity:0,duration:.62,ease:'none'},0)
+     .fromTo(win,{scaleX:open[0],scaleY:open[1],yPercent:9},{scaleX:1,scaleY:1,yPercent:-1,duration:.56,ease:'none'},0)
+     .to(win,{scaleX:over,scaleY:over,yPercent:-11,duration:.44,ease:'none'},.56)
+     .fromTo(art,{scaleX:1/open[0],scaleY:1/open[1]},{scaleX:1,scaleY:1,duration:.56,ease:'none'},0)
+     .to(art,{scaleX:1/over,scaleY:1/over,duration:.44,ease:'none'},.56)
+     .fromTo(near,{yPercent:32,xPercent:-5},{yPercent:-32,xPercent:5,duration:1,ease:'none'},0);
+   });
+  });
   return()=>ctx.revert();
  },[reduced]);
  useEffect(()=>{
   if(reduced)return;
   const ctx=gsap.context(()=>{
    gsap.from('header > *',{y:-26,opacity:0,duration:1,stagger:.1,ease:'power3.out',delay:.15});
-   gsap.from('.chapter-0 .chapter-copy .line',{yPercent:58,opacity:0,duration:1.25,stagger:.12,ease:'power3.out',delay:.35});
+   gsap.from('.chapter-0 .chapter-copy .line-in',{yPercent:132,duration:1.25,stagger:.12,ease:'power3.out',delay:.35});
    gsap.from('.chapter-0 .chapter-copy .eyebrow,.chapter-0 .chapter-copy p,.chapter-0 .chapter-copy .text-link',{y:26,opacity:0,duration:1,stagger:.1,ease:'power3.out',delay:.75});
    gsap.from('.experience-bar,.chapter-nav',{opacity:0,duration:1.1,ease:'power2.out',delay:1});
   });
@@ -113,9 +157,11 @@ function App(){
  const line=t=><span className="line" key={t}><span className="line-in">{t}</span></span>;
  return <><a className="skip" href="#threshold">Đến hành trình</a>
   <div className="world" aria-hidden="true"><Boundary><Suspense fallback={<span className="loading">Đang mở không gian 3D…</span>}><Scene signal={signal} pointer={pointer} paused={paused} reduced={reduced} speed={speed} hidden={hidden} light={light}/></Suspense></Boundary></div>
+  <Stage light={light}/>
   <header><a className="logo" href="#threshold" onClick={e=>{e.preventDefault();go(0)}} aria-label="Limen, về đầu hành trình">LIMEN</a><span className="header-note">An exhibition of<br/>impossible forms</span><div className="header-actions"><button onClick={()=>setInfo(true)}>Về triển lãm <ArrowUpRight/></button><button className="icon-button" aria-label={light?'Giao diện tối':'Giao diện sáng'} onClick={()=>setLight(!light)}>{light?<Moon/>:<Sun/>}</button></div></header>
   <nav className="chapter-nav" aria-label="Các chương triển lãm"><span className="nav-rail" aria-hidden="true"><span className="nav-rail-fill" ref={rail}/></span>{chapters.map((c,i)=><button key={c.id} onClick={()=>go(i)} aria-label={`Đến ${c.name}`} aria-current={active===i?'step':undefined}><span className="nav-label">{c.name}</span><span className="nav-tick"/></button>)}</nav>
   <main ref={root} id="journey">{chapters.map((c,i)=><section key={c.id} id={c.id} className={`chapter chapter-${i} ${c.side}`} aria-labelledby={`title-${c.id}`}><div className="chapter-word" aria-hidden="true">{c.en}</div><div className="chapter-inner"><div className="chapter-copy"><span className="eyebrow">{c.label}</span>{i===0?<h1 id={`title-${c.id}`}>{c.title.map(line)}</h1>:<h2 id={`title-${c.id}`}>{c.title.map(line)}</h2>}<p>{c.text}</p>{i===0?<button className="text-link" onClick={()=>go(1)}>Bắt đầu hành trình <ArrowRight/></button>:i===7?<button className="text-link" onClick={()=>go(0)}>Trải nghiệm lại <ArrowsClockwise/></button>:<span className="chapter-caption">{c.en} / {c.name}</span>}</div><p className="chapter-note">{c.note}</p>{i===7&&<div className="end-credit">Tạo nên từ hình học, ánh sáng và trí tưởng tượng.<br/>© 2026 LIMEN</div>}</div></section>)}</main>
+  <div className="veil" aria-hidden="true"><div className="grain"/></div>
   <div className="experience-bar"><div className="current-chapter" aria-live="polite"><span className="chapter-count">{String(active+1).padStart(2,'0')} / 08</span><span>{chapters[active].name}</span></div><div className="experience-controls"><button className="icon-button" aria-label={paused?'Tiếp tục chuyển động':'Tạm dừng chuyển động'} aria-pressed={paused} onClick={()=>setPaused(p=>!p)}>{paused?<Play/>:<Pause/>}</button><label className="speed">Nhịp độ<input aria-label="Nhịp độ chuyển động" type="range" min="0.3" max="2" step="0.1" value={speed} onChange={e=>setSpeed(Number(e.target.value))}/></label><button className="icon-button" aria-label="Xoay góc nhìn" onClick={()=>{signal.current.turn+=Math.PI/6;signal.current.invalidate?.()}}><ArrowsClockwise/></button><button className="sound-button" aria-label={sound?'Tắt âm thanh':'Bật âm thanh'} aria-pressed={sound} onClick={toggleSound}>{sound?<SpeakerHigh/>:<SpeakerSlash/>}<span>Âm thanh {sound?'bật':'tắt'}</span></button></div></div>
   <dialog ref={dialog} aria-labelledby="about-title" onCancel={()=>setInfo(false)} onClose={()=>setInfo(false)} onClick={e=>{if(e.target===dialog.current)setInfo(false)}}><button className="close icon-button" aria-label="Đóng" onClick={()=>setInfo(false)}><X/></button><span className="eyebrow">VỀ TRIỂN LÃM</span><h2 id="about-title">Giữa hai thế giới.</h2><p>LIMEN là một triển lãm nghệ thuật số phi thương mại. Tám chương nối tiếp nhau, từ hình hài đầu tiên đến phân rã và tái sinh.</p><p>Cuộn để khám phá, hoặc dùng phím mũi tên lên xuống, Home và End để đi giữa các chương. Thanh điều hướng bên cạnh đưa thẳng tới một chương bất kỳ.</p><p>Mỗi chương có một khối hình riêng. Khi cuộn, khối đang hiển thị tan ra và dựng lại thành khối của chương kế tiếp.</p><p>Âm thanh tắt mặc định. Khi thiết bị yêu cầu giảm chuyển động, nội dung hiển thị trực tiếp và hình khối đổi theo từng chương.</p><label className="motion-option"><input type="checkbox" checked={reduced} onChange={e=>setReduced(e.target.checked)}/> Giảm chuyển động</label><button className="text-link" onClick={()=>setInfo(false)}>Trở lại hành trình <ArrowRight/></button></dialog>
  </>
