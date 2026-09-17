@@ -313,7 +313,9 @@ function Atmosphere({theme,env,still,low}){
   <shaderMaterial uniforms={uniforms} vertexShader={DUST_VERT} fragmentShader={DUST_FRAG} transparent depthWrite={false} blending={THREE.AdditiveBlending}/>
  </points>;
 }
-function Forms({signal,paused,reduced,speed,pointer,theme,still,env,low}){
+// ambient: lớp 3D lùi về sau làm khí quyển cho hệ sơ đồ. Khối nhỏ lại, lùi xa và bớt dạt sang một bên
+// để không tranh chỗ với sơ đồ, nhưng vẫn giữ nguyên toàn bộ nhịp biến hình theo cuộn.
+function Forms({signal,paused,reduced,speed,pointer,theme,still,env,low,ambient}){
  const group=useRef(),key=useRef(),fill=useRef(),amb=useRef(),meshes=useRef([]);
  const time=useRef(0),spin=useRef(0),vel=useRef(0),shift=useRef(0);
  const {size,invalidate,camera,scene}=useThree();
@@ -372,10 +374,10 @@ function Forms({signal,paused,reduced,speed,pointer,theme,still,env,low}){
    mesh.instanceMatrix.needsUpdate=true;
   }
   const narrow=size.width<700,mix=smoothstep(frac,0,1),slow=smootherstep(frac,0,1);
-  const wanted=narrow?0:lerp(SHIFT[a],SHIFT[b],mix);
+  const wanted=narrow?0:lerp(SHIFT[a],SHIFT[b],mix)*(ambient?.3:1);
   shift.current=still?wanted:damp(shift.current,wanted,6,dt);
   group.current.position.set(shift.current,(narrow?.85:0)+lerp(LIFT[a],LIFT[b],mix),0);
-  group.current.scale.setScalar((narrow?.6:.86)*lerp(.82,1,ease));
+  group.current.scale.setScalar((narrow?.6:.86)*lerp(.82,1,ease)*(ambient?.46:1));
   group.current.rotation.set(.2+pointer.current.y*.12*live,
    -.28+(reduced?a:p)*.3+time.current*.07+s.turn+spin.current,
    -.16+pointer.current.x*.1*live+spin.current*.25);
@@ -386,7 +388,7 @@ function Forms({signal,paused,reduced,speed,pointer,theme,still,env,low}){
   const px=pointer.current.x*.42*live,py=-pointer.current.y*.28*live;
   camera.position.x=damp(camera.position.x,cur[0]+px,4,dt);
   camera.position.y=damp(camera.position.y,cur[1]+py,4,dt);
-  camera.position.z=damp(camera.position.z,cur[2]+(narrow?1.7:0)+burst*.5+vel.current*.4,4,dt);
+  camera.position.z=damp(camera.position.z,cur[2]+(narrow?1.7:0)+(ambient?2.6:0)+burst*.5+vel.current*.4,4,dt);
   scratch.tgt.set(cur[3],cur[4]+(narrow?.6:0),cur[5]);
   camera.lookAt(scratch.tgt);
   const fov=cur[6]+(narrow?4:0)+vel.current*3.5-burst*1.2;
@@ -439,7 +441,7 @@ export default function Scene(props){
   l1:[0,0,0,0],l2:[0,0,0,0],vel:0,energy:0,focus:0,focusY:.52,intro:0}),[]);
  useEffect(()=>{if(contextLost){const id=setTimeout(()=>setContextLost(false),1200);return()=>clearTimeout(id)}},[contextLost]);
  if(contextLost)return <SceneFallback/>;
- return <Canvas fallback={<SceneFallback/>} frameloop={still?'demand':'always'} dpr={[1,1.25]} camera={{position:[0,0,8.4],fov:42}}
+ return <Canvas fallback={<SceneFallback/>} frameloop={still?'demand':'always'} dpr={props.ambient?.55:[1,1.25]} camera={{position:[0,0,8.4],fov:42}}
   gl={{alpha:false,antialias:true,powerPreference:'default',failIfMajorPerformanceCaveat:false}}
   onCreated={({gl})=>{
    const onLost=event=>{event.preventDefault();setContextLost(true)};
@@ -449,7 +451,7 @@ export default function Scene(props){
   <color attach="background" args={[theme.bg]}/>
   <fog attach="fog" args={[theme.bg,4,18]}/>
   <Forms {...props} theme={theme} still={still} env={env} low={low}/>
-  <Backdrop env={env} quality={low?0:1}/>
-  <Atmosphere theme={theme} env={env} still={still} low={low}/>
+  <Backdrop env={env} quality={low||props.ambient?0:1}/>
+  <Atmosphere theme={theme} env={env} still={still} low={low||props.ambient}/>
  </Canvas>;
 }
