@@ -13,40 +13,85 @@ import {ArrowsClockwise} from '@phosphor-icons/react/dist/csr/ArrowsClockwise';
 import {FadersHorizontal} from '@phosphor-icons/react/dist/csr/FadersHorizontal';
 import gsap from 'gsap';
 import {ScrollTrigger} from 'gsap/ScrollTrigger';
+import {ScrollToPlugin} from 'gsap/ScrollToPlugin';
 import {chapters} from './chapters';
 import {createSoundscape} from './sound';
+import './archivo.css';
+// Archivo đã nhận logo, tiêu đề và chữ khổng lồ, nên Manrope chỉ còn lo chữ nhỏ và giao diện:
+// không còn nơi nào dùng nét 500 hay 600 của nó.
 import '@fontsource/manrope/latin-400.css';
-import '@fontsource/manrope/latin-500.css';
-import '@fontsource/manrope/latin-600.css';
 import '@fontsource/manrope/vietnamese-400.css';
-import '@fontsource/manrope/vietnamese-500.css';
-import '@fontsource/manrope/vietnamese-600.css';
 import './style.css';
-gsap.registerPlugin(ScrollTrigger);
+gsap.registerPlugin(ScrollTrigger,ScrollToPlugin);
 ScrollTrigger.config({ignoreMobileResize:true});
+const THEME_KEY='limen:theme';
+// Đọc hash ngay lúc nạp module, trước khi React chạy hiệu ứng nào. Hiệu ứng đồng bộ địa chỉ chạy lần đầu
+// khi chương đang mở vẫn là 01, và nếu nó ghi trước thì hash của link sâu đã bị xoá mất trước khi đọc.
+const INITIAL_HASH=typeof location==='undefined'?'':decodeURIComponent(location.hash.slice(1));
 const Scene=lazy(()=>import('./Scene'));
-// h,s,l,alpha của chữ nền cho mỗi giao diện; TINT là độ lệch hue/lum của tám chương, khớp với bảng trạng thái trong Scene.
-const DISPLAY={dark:[118,10,49,.17],light:[105,15,47,.15]};
-const TINT=[[0,0],[3.6,2],[-5.4,.8],[-10.8,-1],[7.9,3],[-14.4,-2],[2.9,1],[0,5]];
+// Giao diện phải thở cùng một nhịp màu với cảnh 3D. Nếu nền 3D đi sang hổ phách ở chương Nở rộ mà
+// thanh dưới cùng, dải mờ của header và lớp scrim sau khối chữ vẫn giữ xanh rêu thì phần chrome đọc ra
+// là một mảng vá dán lên tác phẩm. Ba bề mặt dưới đây vì vậy dùng chung đúng bảng lệch màu với `KEYS`
+// trong Scene: cùng độ lệch hue theo độ, cùng hệ số bão hoà, cùng độ lệch sáng.
+// Chữ, màu nhấn và đường kẻ giữ nguyên vì chúng đã được đo tương phản.
+const SURFACE={
+ dark :{bg:[174.5,24,8.8],wash:[149,22.5,21.8],display:[118,10,49,.17]},
+ light:{bg:[168,12,85],wash:[152,18,72],display:[160,13,48,.16]},
+};
+// hue (độ) | hệ số bão hoà | độ lệch sáng (điểm phần trăm)
+const TINT=[[52,1.12,-.6],[12,1.30,1.4],[44,.92,-.4],[28,1.18,.2],[-96,1.40,1.8],[62,.52,-1.2],[-70,.88,1.0],[48,.76,1.6]];
+const hsl=([h,s,l],[dh,ds,dl],a)=>`hsl(${h+dh} ${Math.min(96,Math.max(2,s*ds)).toFixed(1)}% ${Math.min(96,Math.max(2,l+dl)).toFixed(1)}%${a==null?'':` / ${a}`})`;
 // Chữ khổng lồ trôi mỗi chương một tốc độ khác nhau. Chênh lệch tốc độ chính là thứ tạo ra chiều sâu:
 // Ngưỡng cửa gần như đứng yên phía sau, Phân rã trượt nhanh nhất.
 const DRIFT=[-14,-22,-30,-24,-18,-34,-26,-12];
 const SPLIT=[5,6];
-class Boundary extends Component{state={error:false};static getDerivedStateFromError(){return{error:true}}render(){return this.state.error?<div className="fallback" role="status">Cảnh 3D không khả dụng trên trình duyệt này. Hành trình nội dung vẫn tiếp tục.</div>:this.props.children}}
+class Boundary extends Component{state={error:false};static getDerivedStateFromError(){return{error:true}}
+ // Cảnh hỏng thì màn mở đầu phải nhấc lên ngay, không bắt người xem chờ hết thời gian dự phòng.
+ componentDidCatch(){this.props.onError?.()}
+ render(){return this.state.error?<div className="fallback" role="status">Cảnh 3D không khả dụng trên trình duyệt này. Hành trình nội dung vẫn tiếp tục.</div>:this.props.children}}
 function App(){
- const [active,setActive]=useState(0),[reduced,setReduced]=useState(matchMedia('(prefers-reduced-motion: reduce)').matches),[paused,setPaused]=useState(false),[speed,setSpeed]=useState(1),[sound,setSound]=useState(false),[light,setLight]=useState(!matchMedia('(prefers-color-scheme: dark)').matches),[info,setInfo]=useState(false),[hidden,setHidden]=useState(document.hidden),[panel,setPanel]=useState(false),[pointerOn,setPointerOn]=useState(true);
- const signal=useRef({p:0,smooth:0,tail:0,tailSmooth:0,v:0,turn:0,invalidate:null}),pointer=useRef({x:0,y:0}),root=useRef(),audio=useRef(),dialog=useRef(),rail=useRef(),bar=useRef(),panelRef=useRef(),panelButton=useRef();
- useEffect(()=>{document.documentElement.dataset.theme=light?'light':'dark'},[light]);
+ const [active,setActive]=useState(0),[reduced,setReduced]=useState(matchMedia('(prefers-reduced-motion: reduce)').matches),[paused,setPaused]=useState(false),[speed,setSpeed]=useState(1),[sound,setSound]=useState(false),[light,setLight]=useState(()=>document.documentElement.dataset.theme==='light'),[info,setInfo]=useState(false),[hidden,setHidden]=useState(document.hidden),[panel,setPanel]=useState(false),[pointerOn,setPointerOn]=useState(true),[ready,setReady]=useState(false),[routed,setRouted]=useState(false);
+ const signal=useRef({p:0,smooth:0,tail:0,tailSmooth:0,v:0,turn:0,invalidate:null}),pointer=useRef({x:0,y:0}),root=useRef(),audio=useRef(),dialog=useRef(),rail=useRef(),bar=useRef(),panelRef=useRef(),panelButton=useRef(),ownReduced=useRef(false);
+ // Giao diện đã được script nội tuyến trong index.html chốt trước khung hình đầu tiên; ở đây chỉ ghi lại lựa chọn.
+ useEffect(()=>{document.documentElement.dataset.theme=light?'light':'dark';try{localStorage.setItem(THEME_KEY,light?'light':'dark')}catch{}},[light]);
+ // Màn mở đầu nhấc lên khi cảnh thật sự vẽ xong. Thời gian dự phòng để trang không bao giờ kẹt sau tấm màn.
+ useEffect(()=>{const id=setTimeout(()=>setReady(true),4200);return()=>clearTimeout(id)},[]);
+ useEffect(()=>{
+  if(!ready)return;
+  document.documentElement.dataset.ready='';
+  const el=document.getElementById('curtain');
+  if(!el)return;
+  const id=setTimeout(()=>el.remove(),1100);
+  return()=>clearTimeout(id);
+ },[ready]);
  // Giao diện đọc cùng nhịp màu với cảnh 3D: chữ nền khổng lồ và thanh địa chỉ trôi theo tông của chương đang mở.
  useEffect(()=>{
-  const [h,s,l,alpha]=DISPLAY[light?'light':'dark'],[dh,dl]=TINT[active];
-  document.documentElement.style.setProperty('--display',`hsl(${h+dh} ${s}% ${l+dl}% / ${alpha})`);
-  document.querySelector('meta[name=theme-color]')?.setAttribute('content',light?'#dce3db':'#111c1b');
+  const S=SURFACE[light?'light':'dark'],t=TINT[active],el=document.documentElement;
+  const bg=hsl(S.bg,t);
+  el.style.setProperty('--bg',bg);
+  el.style.setProperty('--scrim',hsl(S.bg,t,.95));
+  el.style.setProperty('--wash',hsl(S.wash,t));
+  el.style.setProperty('--display',hsl(S.display,t,S.display[3]));
+  document.querySelector('meta[name=theme-color]')?.setAttribute('content',bg);
  },[active,light]);
- useEffect(()=>{const mq=matchMedia('(prefers-reduced-motion: reduce)');const change=()=>setReduced(mq.matches);const visibility=()=>setHidden(document.hidden);mq.addEventListener('change',change);document.addEventListener('visibilitychange',visibility);return()=>{mq.removeEventListener('change',change);document.removeEventListener('visibilitychange',visibility)}},[]);
+ // Hệ điều hành chỉ còn quyền quyết định cho tới khi người xem tự chọn trong bảng Tùy chỉnh;
+ // sau đó lựa chọn thủ công thắng, nếu không hai nguồn sẽ ghi đè lẫn nhau.
+ useEffect(()=>{const mq=matchMedia('(prefers-reduced-motion: reduce)');const change=()=>{if(!ownReduced.current)setReduced(mq.matches)};const visibility=()=>setHidden(document.hidden);mq.addEventListener('change',change);document.addEventListener('visibilitychange',visibility);return()=>{mq.removeEventListener('change',change);document.removeEventListener('visibilitychange',visibility)}},[]);
  useEffect(()=>{const move=e=>{pointer.current.x=e.clientX/innerWidth*2-1;pointer.current.y=e.clientY/innerHeight*2-1};window.addEventListener('pointermove',move,{passive:true});return()=>window.removeEventListener('pointermove',move)},[]);
  // Fonts change text metrics, so trigger positions are only final once they land.
- useEffect(()=>{document.fonts?.ready.then(()=>ScrollTrigger.refresh()).catch(()=>{})},[]);
+ // Link sâu phải đợi đúng mốc đó: trình duyệt tự nhảy anchor trước khi React dựng section nên
+ // luôn dừng ở chương 1, và đo vị trí trước khi font về thì lệch. Nhảy thẳng, không cuộn mượt:
+ // người mở link đã ở đúng chương họ muốn, không cần xem lại bảy chương trước.
+ useEffect(()=>{
+  const settle=()=>{
+   ScrollTrigger.refresh();
+   const i=chapters.findIndex(c=>c.id===INITIAL_HASH);
+   const el=i>0?document.getElementById(chapters[i].id):null;
+   if(el){window.scrollTo(0,el.getBoundingClientRect().top+scrollY);ScrollTrigger.update()}
+   setRouted(true);
+  };
+  (document.fonts?.ready||Promise.resolve()).then(settle).catch(settle);
+ },[]);
  useEffect(()=>{
   const ctx=gsap.context(()=>{
    const sections=gsap.utils.toArray('.chapter');
@@ -107,8 +152,9 @@ function App(){
   },root);
   return()=>ctx.revert();
  },[reduced]);
+ // Chỉ chạy sau khi màn mở đầu nhấc lên, nếu không cả màn chào diễn ra sau tấm màn và người xem không thấy gì.
  useEffect(()=>{
-  if(reduced)return;
+  if(reduced||!ready)return;
   const ctx=gsap.context(()=>{
    gsap.from('header > *',{y:-26,opacity:0,duration:1,stagger:.1,ease:'power3.out',delay:.15});
    gsap.from('.chapter-0 .chapter-copy .line',{yPercent:58,opacity:0,duration:1.25,stagger:.12,ease:'power3.out',delay:.35});
@@ -116,7 +162,7 @@ function App(){
    gsap.from('.experience-bar,.chapter-nav',{opacity:0,duration:1.1,ease:'power2.out',delay:1});
   });
   return()=>ctx.revert();
- },[reduced]);
+ },[reduced,ready]);
  useEffect(()=>{if(info)dialog.current?.showModal();else if(dialog.current?.open)dialog.current.close()},[info]);
  useEffect(()=>()=>{audio.current?.close()},[]);
  // Bảng tùy chỉnh không khoá trang: người xem vẫn cuộn được khi đang chỉnh. Đóng bằng Esc hoặc bấm ra ngoài,
@@ -130,7 +176,24 @@ function App(){
   document.addEventListener('pointerdown',out);
   return()=>{document.removeEventListener('keydown',key,true);document.removeEventListener('pointerdown',out)};
  },[panel]);
- function go(i){document.getElementById(chapters[i].id)?.scrollIntoView({behavior:reduced?'instant':'smooth',block:'start'})}
+ // Cuộn mượt của trình duyệt đi hết 1.7 giây cho quãng chương 1 tới chương 8, và thời lượng do trình duyệt
+ // quyết chứ không phải trang. Ở đây thời lượng kẹp trong 0.7–1.5 giây theo quãng đường, nên một cú nhảy xa
+ // là một chuyển cảnh có nhịp chứ không phải đoạn tua nhanh qua sáu chương.
+ function go(i){
+  const el=document.getElementById(chapters[i].id);
+  if(!el)return;
+  const y=el.getBoundingClientRect().top+scrollY;
+  gsap.killTweensOf(window);
+  if(reduced){window.scrollTo(0,y);return}
+  gsap.to(window,{scrollTo:{y,autoKill:true},ease:'power3.inOut',
+   duration:gsap.utils.clamp(.7,1.5,Math.abs(y-scrollY)/2600)});
+ }
+ // Địa chỉ đi theo chương đang mở, nên chia sẻ được đúng chỗ người xem đang đứng. Chương một giữ URL sạch.
+ useEffect(()=>{
+  if(!routed)return;
+  const want=active>0?`#${chapters[active].id}`:'';
+  if(location.hash!==want)history.replaceState(null,'',location.pathname+location.search+want);
+ },[active,routed]);
  useEffect(()=>{
   const key=e=>{
    if(e.defaultPrevented||e.metaKey||e.ctrlKey||e.altKey)return;
@@ -166,7 +229,7 @@ function App(){
   ?<div className="chapter-word split" aria-hidden="true">{c.en}<span className="word-piece word-top">{c.en}</span><span className="word-piece word-bottom">{c.en}</span></div>
   :<div className="chapter-word" aria-hidden="true">{c.en}</div>;
  return <><a className="skip" href="#threshold">Đến hành trình</a>
-  <div className="world" aria-hidden="true"><Boundary><Suspense fallback={<span className="loading">Đang mở không gian 3D…</span>}><Scene signal={signal} pointer={pointer} pointerOn={pointerOn} paused={paused} reduced={reduced} speed={speed} hidden={hidden} light={light}/></Suspense></Boundary></div>
+  <div className="world" aria-hidden="true"><Boundary onError={()=>setReady(true)}><Suspense fallback={<span className="loading">Đang mở không gian 3D…</span>}><Scene signal={signal} pointer={pointer} pointerOn={pointerOn} paused={paused} reduced={reduced} speed={speed} hidden={hidden} light={light} onReady={()=>setReady(true)}/></Suspense></Boundary></div>
   <header><a className="logo" href="#threshold" onClick={e=>{e.preventDefault();go(0)}} aria-label="Limen, về đầu hành trình">LIMEN</a><span className="header-note">An exhibition of<br/>impossible forms</span><div className="header-actions"><button onClick={()=>setInfo(true)}>Về triển lãm <ArrowUpRight/></button></div></header>
   <nav className="chapter-nav" aria-label="Các chương triển lãm"><span className="nav-rail" aria-hidden="true"><span className="nav-rail-fill" ref={rail}/></span>{chapters.map((c,i)=><button key={c.id} onClick={()=>go(i)} aria-label={`Đến chương ${i+1}, ${c.name}`} aria-current={active===i?'step':undefined}><span className="nav-label"><span className="nav-index">{String(i+1).padStart(2,'0')}</span>{c.name}<span className="nav-cue" data-cue={i} aria-hidden="true"/></span><span className="nav-tick"/></button>)}</nav>
   <main ref={root} id="journey">{chapters.map((c,i)=><section key={c.id} id={c.id} className={`chapter chapter-${i} ${c.side}`} aria-labelledby={`title-${c.id}`}>{word(c,i)}<div className="chapter-inner"><div className="chapter-copy"><span className="eyebrow">{c.label}</span>{i===0?<h1 id={`title-${c.id}`}>{c.title.map(line)}</h1>:<h2 id={`title-${c.id}`}>{c.title.map(line)}</h2>}<p>{c.text}</p>{i===0?<button className="text-link" onClick={()=>go(1)}>Bắt đầu hành trình <ArrowRight/></button>:i===7?<button className="text-link" onClick={()=>go(0)}>Trải nghiệm lại <ArrowsClockwise/></button>:<span className="chapter-caption">{c.en} / {c.name}</span>}</div><p className="chapter-note">{c.note}</p>{i===7&&<div className="end-credit">Tạo nên từ hình học, ánh sáng và trí tưởng tượng.<br/>© 2026 LIMEN</div>}</div></section>)}</main>
@@ -184,7 +247,7 @@ function App(){
     <div className="settings-row"><span>Góc nhìn</span><button className="settings-toggle" onClick={()=>{signal.current.turn+=Math.PI/6;signal.current.invalidate?.()}}><ArrowsClockwise/>Xoay một nhịp</button></div>
     <div className="settings-row"><span>Giao diện</span><button className="settings-toggle" aria-pressed={light} onClick={()=>setLight(v=>!v)}>{light?<Moon/>:<Sun/>}{light?'Đang sáng':'Đang tối'}</button></div>
     <label className="settings-row check"><input type="checkbox" checked={pointerOn} onChange={e=>setPointerOn(e.target.checked)}/> Con trỏ tác động vào cảnh</label>
-    <label className="settings-row check"><input type="checkbox" checked={reduced} onChange={e=>setReduced(e.target.checked)}/> Giảm chuyển động</label>
+    <label className="settings-row check"><input type="checkbox" checked={reduced} onChange={e=>{ownReduced.current=true;setReduced(e.target.checked)}}/> Giảm chuyển động</label>
    </div>}
   </div>
   <dialog ref={dialog} aria-labelledby="about-title" onCancel={()=>setInfo(false)} onClose={()=>setInfo(false)} onClick={e=>{if(e.target===dialog.current)setInfo(false)}}><button className="close icon-button" aria-label="Đóng" onClick={()=>setInfo(false)}><X/></button><span className="eyebrow">VỀ TRIỂN LÃM</span><h2 id="about-title">Giữa hai thế giới.</h2><p>LIMEN là một triển lãm nghệ thuật số phi thương mại. Tám chương nối tiếp nhau, từ hình hài đầu tiên đến phân rã và tái sinh.</p><p>Cuộn để khám phá, hoặc dùng phím mũi tên lên xuống, Home và End để đi giữa các chương. Thanh điều hướng bên cạnh đưa thẳng tới một chương bất kỳ.</p><p>Mỗi chương là một thế giới riêng: hình khối, camera, ánh sáng, nền và âm thanh cùng biến đổi theo một trạng thái duy nhất. Không có chương nào bắt đầu lại từ đầu, chương sau luôn hình thành từ vật liệu của chương trước.</p><p>Âm thanh tắt mặc định. Pause, nhịp độ, giao diện và giảm chuyển động nằm trong bảng Tùy chỉnh ở thanh dưới cùng.</p><button className="text-link" onClick={()=>setInfo(false)}>Trở lại hành trình <ArrowRight/></button></dialog>

@@ -1,2 +1,81 @@
-<!doctype html><html lang="vi"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#111c1b"/><meta name="description" content="LIMEN: triển lãm nghệ thuật 3D tương tác. Khám phá tám chương nghệ thuật nối tiếp bằng cuộn và biến hình 3D."/><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23111c1b'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23d0e99d' stroke-width='3'/%3E%3C/svg%3E"/><title>LIMEN | An exhibition of impossible forms</title></head><body><div id="root"></div><script type="module" src="/src/main.jsx"></script></body></html>
-
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="theme-color" content="#111c1b"/>
+<title>LIMEN | An exhibition of impossible forms</title>
+<meta name="description" content="LIMEN: triển lãm nghệ thuật 3D tương tác. Khám phá tám chương nghệ thuật nối tiếp bằng cuộn và biến hình 3D."/>
+<link rel="canonical" href="https://limen-interactive-exhibition.vercel.app/"/>
+<meta property="og:type" content="website"/>
+<meta property="og:site_name" content="LIMEN"/>
+<meta property="og:locale" content="vi_VN"/>
+<meta property="og:url" content="https://limen-interactive-exhibition.vercel.app/"/>
+<meta property="og:title" content="LIMEN | An exhibition of impossible forms"/>
+<meta property="og:description" content="Tám chương nối tiếp trên một thế giới 3D duy nhất: Ngưỡng cửa, Khai mở, Quỹ đạo, Thủy triều, Nở rộ, Phân rã, Hội tụ, Dư âm."/>
+<meta property="og:image" content="https://limen-interactive-exhibition.vercel.app/og.jpg"/>
+<meta property="og:image:width" content="1200"/>
+<meta property="og:image:height" content="630"/><meta property="og:image:type" content="image/jpeg"/>
+<meta property="og:image:alt" content="Những mảnh kim loại vỡ ra thành một vành tròn, mở một khoảng trời ở giữa."/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:title" content="LIMEN | An exhibition of impossible forms"/>
+<meta name="twitter:description" content="Triển lãm 3D tương tác phi thương mại. Tám chương, một thế giới duy nhất biến hình liên tục."/>
+<meta name="twitter:image" content="https://limen-interactive-exhibition.vercel.app/og.jpg"/>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23111c1b'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23d0e99d' stroke-width='3'/%3E%3C/svg%3E"/>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"VisualArtsEvent","name":"LIMEN","description":"Triển lãm nghệ thuật số 3D tương tác phi thương mại gồm tám chương.","url":"https://limen-interactive-exhibition.vercel.app/","image":"https://limen-interactive-exhibition.vercel.app/og.jpg","eventAttendanceMode":"https://schema.org/OnlineEventAttendanceMode","eventStatus":"https://schema.org/EventScheduled","inLanguage":"vi","isAccessibleForFree":true,"location":{"@type":"VirtualLocation","url":"https://limen-interactive-exhibition.vercel.app/"}}</script>
+<!-- Màn mở đầu là HTML tĩnh với CSS nội tuyến: nó vẽ ngay khi HTML về, trước cả khi chunk JS
+     và chunk CSS được tải, nên người xem không bao giờ thấy màn hình trống. React gỡ nó khi cảnh sẵn sàng. -->
+<!-- Giao diện chốt trước khi vẽ khung hình đầu tiên, nếu không màn mở đầu sẽ nháy sai tông
+     với lựa chọn đã lưu của người xem. -->
+<script>try{var s=localStorage.getItem('limen:theme');document.documentElement.dataset.theme=s==='light'||s==='dark'?s:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')}catch(e){}</script>
+<style>
+ :root{color-scheme:dark}
+ html{background:#111c1b}
+ html[data-theme=light]{background:#d4dddc;color-scheme:light}
+ body{margin:0}
+ #curtain{position:fixed;inset:0;z-index:9;display:grid;place-content:center;justify-items:center;gap:26px;
+  background:#111c1b;color:#e8ede7;font-family:Archivo Variable,Manrope,system-ui,sans-serif;
+  transition:opacity .9s ease,visibility .9s}
+ html[data-theme=light] #curtain{background:#d4dddc;color:#152722}
+ #curtain .mark{font-size:clamp(46px,8vw,104px);font-weight:600;letter-spacing:-.06em;line-height:1;
+  display:flex;gap:.02em}
+ #curtain .mark span{display:block;animation:curtain-in .9s cubic-bezier(.2,.7,.2,1) backwards}
+ #curtain .sub{font-size:10px;letter-spacing:2.4px;opacity:.55;text-align:center;line-height:1.9;
+  animation:curtain-in .9s .5s cubic-bezier(.2,.7,.2,1) backwards}
+ #curtain .bar{width:min(210px,44vw);height:1px;background:#ffffff26;overflow:hidden}
+ html[data-theme=light] #curtain .bar{background:#193a2926}
+ #curtain .bar i{display:block;height:100%;background:#d0e99d;transform-origin:left center;
+  animation:curtain-bar 2.6s cubic-bezier(.3,.8,.3,1) infinite}
+ html[data-theme=light] #curtain .bar i{background:#3f5f26}
+ @keyframes curtain-in{from{transform:translateY(42%);opacity:0}}
+ @keyframes curtain-bar{0%{transform:scaleX(0)}70%{transform:scaleX(1)}100%{transform:scaleX(1);opacity:0}}
+ @media(prefers-reduced-motion:reduce){#curtain *{animation:none!important}#curtain .bar i{transform:scaleX(1)}}
+ html[data-ready] #curtain{opacity:0;visibility:hidden;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="curtain" role="status" aria-live="polite">
+ <div class="mark" aria-label="LIMEN"><span style="animation-delay:0s">L</span><span style="animation-delay:.06s">I</span><span style="animation-delay:.12s">M</span><span style="animation-delay:.18s">E</span><span style="animation-delay:.24s">N</span></div>
+ <div class="bar" aria-hidden="true"><i></i></div>
+ <div class="sub">AN EXHIBITION OF IMPOSSIBLE FORMS<br/>ĐANG MỞ KHÔNG GIAN</div>
+</div>
+<div id="root"></div>
+<noscript>
+ <div style="max-width:38rem;margin:14vh auto;padding:0 8vw;font-family:system-ui,sans-serif;color:#e8ede7;line-height:1.9">
+  <h1 style="font-weight:400;letter-spacing:-.04em">LIMEN — An exhibition of impossible forms</h1>
+  <p>Triển lãm nghệ thuật 3D tương tác phi thương mại. Trang cần JavaScript để dựng cảnh 3D. Tám chương của hành trình:</p>
+  <ol>
+   <li><strong>Ngưỡng cửa</strong> — Bước qua điều quen thuộc.</li>
+   <li><strong>Khai mở</strong> — Mở ra. Không giới hạn.</li>
+   <li><strong>Quỹ đạo</strong> — Xa nhau. Vẫn kết nối.</li>
+   <li><strong>Thủy triều</strong> — Lắng nghe một làn sóng.</li>
+   <li><strong>Nở rộ</strong> — Một chuyển động. Ngàn cách nở.</li>
+   <li><strong>Phân rã</strong> — Buông khỏi hình hài.</li>
+   <li><strong>Hội tụ</strong> — Tìm nhau. Thành một.</li>
+   <li><strong>Dư âm</strong> — Mang theo một khoảng lặng.</li>
+  </ol>
+ </div>
+</noscript>
+<script type="module" src="/src/main.jsx"></script>
+</body>
+</html>
