@@ -13,13 +13,23 @@ const ROLES=[
  {n:STRUTS,burst:1.3, lead:[MORPH+.05,.98]},
  {n:NODES, burst:.75, lead:[MORPH+.1,1]},
 ];
+// envSky / envGround / envStrength là một hộp sáng giả đọc thẳng từ pháp tuyến trong hệ toạ độ khung nhìn.
+// Nó thay cho một envMap thật: PMREMGenerator cần render target, mà cả trang được dựng trên cam kết
+// không tạo render target nào để giữ tương thích GPU. Cái này cho ra đúng thứ cần — kim loại có chân trời
+// để phản chiếu — với giá bằng vài phép toán trên mỗi điểm ảnh.
+// dustBlend: cộng dồn trên nền tối là ánh sáng, nhưng cộng dồn trên nền sáng chỉ đẩy mọi thứ về trắng,
+// nên giao diện sáng dùng pha trộn thường với hạt bụi màu tối.
 const PALETTE={
  dark :{bg:'#111c1b',bottom:'#08100e',top:'#22382e',glow:'#3e6f50',rim:'#cfe9a0',rimStrength:.62,accent:'#d0e99d',
         metal:'#c2d0c6',metalAlt:'#d4eba8',strut:'#93a79a',dust:'#cde79f',dustOpacity:.8,emissive:.55,
-        ambient:.4,hemiSky:'#eef5ef',hemiGround:'#17271f',hemi:1.15,key:2.2,keyColor:'#f6fff7',fill:1.35,fillColor:'#d0e99d'},
- light:{bg:'#dce3db',bottom:'#c2d1bd',top:'#f1f4ee',glow:'#ffffff',rim:'#ffffff',rimStrength:.34,accent:'#4f702d',
-        metal:'#71877a',metalAlt:'#54742f',strut:'#5d7568',dust:'#77906c',dustOpacity:.42,emissive:.3,
-        ambient:.72,hemiSky:'#ffffff',hemiGround:'#8fa48d',hemi:1.25,key:2.5,keyColor:'#ffffff',fill:1.05,fillColor:'#aecb84'},
+        ambient:.4,hemiSky:'#eef5ef',hemiGround:'#17271f',hemi:1.15,key:2.2,keyColor:'#f6fff7',fill:1.35,fillColor:'#d0e99d',
+        envSky:'#9fc7ad',envGround:'#0a1512',envStrength:1,vignette:.4,dustBlend:THREE.AdditiveBlending,halo:.95,
+        add:1,core:1},
+ light:{bg:'#d4dddc',bottom:'#a9c1b5',top:'#e8edea',glow:'#7cab94',rim:'#ffffff',rimStrength:.30,accent:'#446126',
+        metal:'#5e7869',metalAlt:'#41631f',strut:'#4f6358',dust:'#40594a',dustOpacity:.30,emissive:.34,
+        ambient:.58,hemiSky:'#ffffff',hemiGround:'#7a9686',hemi:1.0,key:2.3,keyColor:'#ffffff',fill:1.0,fillColor:'#9dbd72',
+        envSky:'#ffffff',envGround:'#678373',envStrength:.55,vignette:.16,dustBlend:THREE.NormalBlending,halo:.34,
+        add:-.85,core:.40},
 };
 // Một bảng trạng thái duy nhất cho cả camera, đèn, sương và nền. Cuộn nội suy thẳng trên bảng này.
 // Mỗi chương có HAI hàng: hàng chẵn là lúc chương vừa tới, hàng lẻ là lúc chương nói hết điều nó muốn nói.
@@ -28,31 +38,35 @@ const PALETTE={
 // 0 cx 1 cy 2 cz | 3 tx 4 ty 5 tz | 6 fov | 7 kx 8 ky 9 kz | 10 key 11 fill 12 ambient 13 rim
 // 14 fogBack 15 fogDepth | 16 hue 17 sat 18 lum 19 glow | 20 emissive | 21 tint đèn (+ lạnh, − ấm)
 const SN=22;
+// Bản trước lệch hue tối đa 0.050 vòng, tức 18 độ trên cả tám chương: đo trên ảnh chụp thì cả tám
+// chương ra cùng một dải xanh rêu, và lời hứa "mỗi chương một thế giới" chỉ đúng ở ánh sáng và bố cục
+// chứ không đúng ở màu. Nay biên độ là 0.275 vòng, tức 165 độ. Xanh vẫn là trục — kim loại, màu nhấn
+// và chữ nhận diện không đổi — nhưng mỗi chương có nhiệt độ riêng: lam đêm, lục lam, hổ phách, thép lạnh.
 const KEYS=[
- // 01 Ngưỡng cửa: đứng xa, viền sáng mạnh, nền tối, rồi tiến vào rất chậm.
- [ 0.00, 0.05, 9.60,  0.00, 0.00, 0.00, 40,  5, 6, 4, 0.80,0.62,0.74,1.50, 4.6,10.0,  0.000,0.94,-0.055,0.55,1.00, 0.35],
- [ 0.00, 0.02, 7.90,  0.00, 0.00, 0.00, 42,  5, 5, 4, 0.92,0.70,0.82,1.42, 4.0, 9.2,  0.004,0.98,-0.040,0.70,1.10, 0.28],
- // 02 Khai mở: ánh sáng chuyển vào bên trong khối, camera tới sát rồi lách một phần qua khe mở.
- [-0.35, 0.10, 7.40,  0.10, 0.00,-0.20, 45,  6, 3, 4, 0.80,1.10,0.94,1.28, 3.6, 8.4,  0.012,1.06, 0.010,1.05,1.35, 0.10],
- [-0.55, 0.06, 5.60,  0.15, 0.00,-0.55, 49,  7, 2, 3, 0.60,1.48,1.05,1.20, 2.6, 7.6,  0.018,1.12, 0.048,1.45,1.80,-0.05],
- // 03 Quỹ đạo: lùi ra thấy cả hệ, đèn lạnh lại, thêm một nhịp trượt ngang.
- [ 0.20, 0.28, 9.60,  0.00, 0.05, 0.00, 41,  3, 7, 6, 1.00,0.95,0.94,1.06, 5.0,12.0, -0.014,0.98,-0.010,0.72,1.15, 0.62],
- [ 1.05, 0.38,10.60,  0.42, 0.02, 0.00, 39,  1, 7, 7, 1.12,0.80,0.86,1.02, 5.8,13.4, -0.020,0.94,-0.020,0.62,1.05, 0.78],
- // 04 Thủy triều: hạ xuống ngang mặt sóng rồi trôi ngang, camera và mục tiêu đi cùng nhau nên bố cục giữ nguyên.
- [-0.25,-0.18, 8.30,  0.00,-0.12, 0.00, 46, -2, 5, 6, 1.00,1.16,1.04,0.96, 3.4, 8.2, -0.028,1.02,-0.008,0.95,1.00, 0.30],
- [-1.25,-0.34, 7.10, -1.05,-0.20, 0.00, 49, -4, 3, 6, 0.96,1.30,1.10,0.90, 3.0, 7.4, -0.036,1.06,-0.016,1.05,1.00, 0.18],
- // 05 Nở rộ: ánh sáng ấm lên, camera vòng nhẹ và dâng theo cụm cánh.
- [ 0.20, 0.72, 9.10,  0.00, 0.28, 0.00, 43,  3, 7, 3, 1.16,0.96,1.08,1.10, 4.4,10.2,  0.018,1.08, 0.024,1.15,1.25,-0.45],
- [ 0.85, 1.45, 8.40,  0.20, 0.55, 0.00, 44,  5, 9, 2, 1.26,0.88,1.14,1.16, 4.0, 9.4,  0.026,1.12, 0.036,1.30,1.40,-0.62],
- // 06 Phân rã: tương phản cao, chùm sáng gắt, rồi camera đi thẳng qua khoảng trống giữa các mảnh.
- [ 0.00, 0.22, 9.20,  0.00, 0.02, 0.00, 45,  6, 2, 5, 0.88,1.30,0.82,1.40, 3.8, 8.0, -0.038,0.92,-0.034,0.80,1.55, 0.50],
- [ 0.00, 0.16, 4.00,  0.00, 0.00,-0.60, 50,  7, 1, 3, 0.74,1.52,0.70,1.62, 2.4, 8.6, -0.050,0.86,-0.048,0.72,1.85, 0.66],
- // 07 Hội tụ: lùi thật xa trước, các nguồn sáng còn rời nhau, rồi về giữa và hợp thành một nguồn.
- [-0.75, 0.24,11.60,  0.00, 0.00, 0.00, 40, -5, 5, 4, 1.02,1.10,0.96,1.12, 5.6,14.2,  0.002,1.00, 0.000,0.88,1.20, 0.30],
- [ 0.00, 0.14, 8.60,  0.00, 0.00, 0.00, 42,  0, 6, 6, 1.14,0.92,1.02,1.20, 5.0,13.0,  0.010,1.04, 0.014,1.10,1.30, 0.06],
- // 08 Dư âm: gần như không còn chuyển động, sáng khuếch tán, tint hơi lạnh trở lại đúng như chương một.
- [ 0.00, 0.10, 9.00,  0.00, 0.00, 0.00, 41,  0, 4, 7, 0.92,1.02,1.20,0.92, 5.2,13.4,  0.000,0.88, 0.044,1.15,0.92, 0.12],
- [ 0.00, 0.06, 8.80,  0.00, 0.00, 0.00, 41,  1, 5, 6, 0.86,0.96,1.22,0.96, 5.0,13.2, -0.002,0.84, 0.052,1.02,0.86, 0.20],
+ // 01 Ngưỡng cửa: đứng xa, viền sáng mạnh, nền tối, lam đêm, rồi tiến vào rất chậm.
+ [ 0.00, 0.05, 9.60,  0.00, 0.00, 0.00, 40,  5, 6, 4, 0.80,0.62,0.74,1.50, 4.6,10.0,  0.144,1.10,-0.055,0.55,1.00, 0.55],
+ [ 0.00, 0.02, 7.90,  0.00, 0.00, 0.00, 42,  5, 5, 4, 0.92,0.70,0.82,1.42, 4.0, 9.2,  0.150,1.14,-0.040,0.70,1.10, 0.45],
+ // 02 Khai mở: ánh sáng chuyển vào bên trong khối, màu về lại xanh lục gốc và bão hoà lên.
+ [-0.35, 0.10, 7.40,  0.10, 0.00,-0.20, 45,  6, 3, 4, 0.80,1.10,0.94,1.28, 3.6, 8.4,  0.033,1.18, 0.005,1.05,1.35, 0.10],
+ [-0.55, 0.06, 5.60,  0.15, 0.00,-0.55, 49,  7, 2, 3, 0.60,1.48,1.05,1.20, 2.6, 7.6,  0.040,1.26, 0.030,1.45,1.80,-0.05],
+ // 03 Quỹ đạo: lùi ra thấy cả hệ, lam lạnh và nhạt đi, đúng nhiệt độ của khoảng không.
+ [ 0.20, 0.28, 9.60,  0.00, 0.05, 0.00, 41,  3, 7, 6, 1.00,0.95,0.94,1.06, 5.0,12.0,  0.122,0.95,-0.010,0.72,1.15, 0.85],
+ [ 1.05, 0.38,10.60,  0.42, 0.02, 0.00, 39,  1, 7, 7, 1.12,0.80,0.86,1.02, 5.8,13.4,  0.128,0.90,-0.020,0.62,1.05, 1.00],
+ // 04 Thủy triều: hạ xuống ngang mặt sóng rồi trôi ngang. Lục lam, bão hoà cao, màu của nước sâu.
+ [-0.25,-0.18, 8.30,  0.00,-0.12, 0.00, 46, -2, 5, 6, 1.00,1.16,1.04,0.96, 3.4, 8.2,  0.078,1.15,-0.008,0.95,1.00, 0.42],
+ [-1.25,-0.34, 7.10, -1.05,-0.20, 0.00, 49, -4, 3, 6, 0.96,1.30,1.10,0.90, 3.0, 7.4,  0.084,1.22,-0.016,1.05,1.00, 0.30],
+ // 05 Nở rộ: hổ phách. Chương ấm nhất của cả hành trình, lệch xa nhất khỏi trục xanh.
+ [ 0.20, 0.72, 9.10,  0.00, 0.28, 0.00, 43,  3, 7, 3, 1.16,0.96,1.08,1.10, 4.4,10.2, -0.267,1.18,-0.012,0.95,1.25,-0.78],
+ [ 0.85, 1.45, 8.40,  0.20, 0.55, 0.00, 44,  5, 9, 2, 1.26,0.88,1.14,1.16, 4.0, 9.4, -0.275,1.26, 0.004,1.06,1.40,-0.95],
+ // 06 Phân rã: thép lạnh. Bão hoà rút gần hết để tương phản sáng tối làm việc một mình.
+ [ 0.00, 0.22, 9.20,  0.00, 0.02, 0.00, 45,  6, 2, 5, 0.88,1.30,0.82,1.40, 3.8, 8.0,  0.172,0.55,-0.040,0.80,1.55, 0.72],
+ [ 0.00, 0.16, 4.00,  0.00, 0.00,-0.60, 50,  7, 1, 3, 0.74,1.52,0.70,1.62, 2.4, 8.6,  0.180,0.48,-0.055,0.72,1.85, 0.92],
+ // 07 Hội tụ: các nguồn rời nhau hợp thành một, màu ngả vàng trắng khi chúng nhập lại.
+ [-0.75, 0.24,11.60,  0.00, 0.00, 0.00, 40, -5, 5, 4, 1.02,1.10,0.96,1.12, 5.6,14.2, -0.194,0.85, 0.008,0.88,1.20,-0.30],
+ [ 0.00, 0.14, 8.60,  0.00, 0.00, 0.00, 42,  0, 6, 6, 1.14,0.92,1.02,1.20, 5.0,13.0, -0.186,0.92, 0.016,1.10,1.30,-0.44],
+ // 08 Dư âm: quay về phía lam của chương một, nhạt hơn và khuếch tán hơn.
+ [ 0.00, 0.10, 9.00,  0.00, 0.00, 0.00, 41,  0, 4, 7, 1.08,1.10,1.14,1.18, 5.2,13.4,  0.133,0.80, 0.022,1.15,1.05, 0.40],
+ [ 0.00, 0.06, 8.80,  0.00, 0.00, 0.00, 41,  1, 5, 6, 1.02,1.04,1.16,1.24, 5.0,13.2,  0.138,0.72, 0.030,1.02,1.00, 0.50],
 ];
 // Bố cục: chữ bên nào thì khối dồn về phía đối diện. Hai chương căn đáy được nâng lên để không đè chữ.
 const SHIFT=[1.65,-1.75,1.6,-1.7,1.6,0,-1.7,.5],LIFT=[0,0,0,0,-.1,.35,0,.65];
@@ -74,7 +88,7 @@ const ENVS=[
  // 04 Thủy triều: hai hệ sóng ngang chồng nhau, hệ thứ nhất còn bị uốn theo trục dọc.
  [16,1.10,0.00, 0.000,  0, 0, 6.0,0.0,  0.420,  2.5,0.26,3.0,   0,  0,  9.5,2.6, -0.310,  2.0,0.10,  0.00,0.00,0.05,0.00,0.30, 0.22],
  // 05 Nở rộ: bào tử phát sáng trôi lên trong một trường mềm.
- [22,0.72,0.42, 0.220,  0, 0, 0.0,0.0,  0.000,  2.0,0.00,0.0,   0,  0,  0.0,0.0,  0.000,  2.0,0.00,  0.00,0.00,0.11,0.05,0.32, 0.30],
+ [34,0.82,0.26, 0.200,  0, 0, 0.0,0.0,  0.000,  2.0,0.00,0.0,   0,  0,  0.0,0.0,  0.000,  2.0,0.00,  0.00,0.00,0.09,0.05,0.26, 0.19],
  // 06 Phân rã: hai họ đường nứt sắc cắt qua nền, nền tách thành mặt phẳng lệch sáng, bụi mịn bay.
  [22,0.90,0.22,-0.140,  0, 0,13.0, 9.0, 0.020, 90.0,0.45,1.4,  0,  0, -9.0,15.0,-0.015,75.0,0.34,  0.16,0.00,0.02,0.00,0.18, 0.18],
  // 07 Hội tụ: hai họ đường sức xoắn ngược chiều nhau về một tâm đang sáng dần.
@@ -208,18 +222,36 @@ function plateGeometry(){
  g.center();g.scale(1/1.12,1/1.12,1/.62);
  return g;
 }
+// Bốn đèn trực tiếp không đủ để kim loại ra kim loại: thiếu một môi trường để phản chiếu, nên phiến
+// đọc ra là nhựa xám. Ở đây pháp tuyến trong hệ toạ độ khung nhìn được dùng làm toạ độ tra cứu một hộp
+// sáng giả: trời ở trên, sàn ở dưới, và một dải sáng hẹp ở ngang tầm mắt. Chính dải chân trời đó là thứ
+// mắt đọc ra là bề mặt bóng. Hai màu của hộp sáng đi theo môi trường từng chương, nên phản chiếu trên
+// kim loại đổi màu cùng lúc với nền — đúng hiệu quả của một envMap thật, không cần một render target nào.
 function makeMaterial(theme,kind){
  const m=new THREE.MeshStandardMaterial(kind==='node'
   ?{color:theme.metalAlt,metalness:.3,roughness:.34,flatShading:true,emissive:new THREE.Color(theme.rim),emissiveIntensity:theme.emissive}
-  :kind==='strut'?{color:theme.strut,metalness:.55,roughness:.45,flatShading:true}
-  :{metalness:.74,roughness:.27,flatShading:true});
+  :kind==='strut'?{color:theme.strut,metalness:.62,roughness:.38,flatShading:true}
+  :{metalness:.84,roughness:.21,flatShading:true});
  const k=kind==='node'?1.5:kind==='strut'?.7:1;
- m.userData.rim={uRim:{value:new THREE.Color(theme.rim)},uRimPower:{value:2.6},uRimStrength:{value:theme.rimStrength*k},uRimBase:k};
+ const envK=kind==='node'?.42:kind==='strut'?.6:1;
+ m.userData.rim={
+  uRim:{value:new THREE.Color(theme.rim)},uRimPower:{value:2.6},uRimStrength:{value:theme.rimStrength*k},uRimBase:k,
+  uEnvSky:{value:new THREE.Color(theme.envSky)},uEnvGround:{value:new THREE.Color(theme.envGround)},
+  uEnvStrength:{value:theme.envStrength*envK},uEnvBase:envK,
+ };
  m.onBeforeCompile=s=>{
   Object.assign(s.uniforms,m.userData.rim);
   s.fragmentShader=s.fragmentShader
-   .replace('#include <common>','#include <common>\nuniform vec3 uRim;uniform float uRimPower;uniform float uRimStrength;')
-   .replace('#include <opaque_fragment>','float fres=pow(1.0-saturate(dot(normalize(normal),normalize(vViewPosition))),uRimPower);\noutgoingLight+=uRim*fres*uRimStrength;\n#include <opaque_fragment>');
+   .replace('#include <common>','#include <common>\nuniform vec3 uRim,uEnvSky,uEnvGround;uniform float uRimPower,uRimStrength,uEnvStrength;')
+   .replace('#include <opaque_fragment>',`
+ vec3 nrm=normalize(normal);
+ float ny=nrm.y;
+ vec3 box=mix(uEnvGround,uEnvSky,smoothstep(-0.85,0.85,ny));
+ float horizon=smoothstep(0.14,0.0,abs(ny));
+ float fres=pow(1.0-saturate(dot(nrm,normalize(vViewPosition))),uRimPower);
+ outgoingLight+=box*uEnvStrength*0.22+uEnvSky*horizon*uEnvStrength*0.5;
+ outgoingLight+=uRim*fres*uRimStrength;
+ #include <opaque_fragment>`);
  };
  return m;
 }
@@ -230,7 +262,7 @@ const BACKDROP_VERT='varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(positi
 // tham số, không ở việc có chạy hay không. Nhờ vậy giá cố định, và chuyển chương là nội suy tham số
 // chứ không phải hoán đổi lớp: hạt đổi mật độ, đường đổi hướng và độ sắc, sương đổi biên độ.
 const BACKDROP_FRAG=`
-uniform vec3 uTop,uBottom,uGlow;uniform float uTime,uAspect,uEnergy,uVel,uGlowBase;
+uniform vec3 uTop,uBottom,uGlow;uniform float uTime,uAspect,uEnergy,uVel,uGlowBase,uVignette,uAdd,uCore;
 uniform vec2 uFocus;uniform vec4 uF,uL1a,uL1b,uL2a,uL2b,uX;varying vec2 vUv;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
@@ -241,17 +273,17 @@ void main(){
  float d=length(p);
  vec3 grad=mix(uBottom,uTop,smoothstep(0.0,1.0,uv.y));
  vec3 col=grad;
- col+=uGlow*(1.0-smoothstep(0.0,0.95,d))*uGlowBase;
+ col+=uGlow*(1.0-smoothstep(0.0,0.95,d))*uGlowBase*uCore;
  float atmo=noise(vec2(uv.x*2.1+uTime*0.035,uv.y*1.5-uTime*0.022));
- col+=uGlow*atmo*0.30*(1.0-smoothstep(0.1,1.25,d))*uEnergy;
+ col+=uGlow*uAdd*atmo*0.30*(1.0-smoothstep(0.1,1.25,d))*uEnergy;
  // Sương của Ngưỡng cửa và Dư âm, lõi sáng của Khai mở và Hội tụ. Cùng một trường khí quyển, đổi biên độ.
- col+=uGlow*smoothstep(0.34,0.82,atmo)*uX.z*(1.0-smoothstep(0.2,1.2,d));
- col+=uGlow*(1.0-smoothstep(0.0,0.55,d))*uX.w;
+ col+=uGlow*uAdd*smoothstep(0.34,0.82,atmo)*uX.z*(1.0-smoothstep(0.2,1.2,d));
+ col+=uGlow*(1.0-smoothstep(0.0,0.55,d))*uX.w*uCore;
  // Trường hạt: sao ở chiều sâu của Quỹ đạo, bào tử của Nở rộ, bụi của Phân rã. Ngưỡng ô quyết định mật độ.
  vec2 fp=p*uF.x+vec2(0.0,-uTime*uF.w);
  vec2 fi=floor(fp),ff=fract(fp)-0.5;
  vec2 jit=(vec2(hash(fi+3.0),hash(fi+11.0))-0.5)*0.7;
- col+=uGlow*smoothstep(uL2b.w,0.0,length(ff-jit))*step(uF.y,hash(fi))*uF.z;
+ col+=uGlow*uAdd*smoothstep(uL2b.w,0.0,length(ff-jit))*step(uF.y,hash(fi))*uF.z;
  // Hai họ đường. Cùng một công thức cho tia Khai mở, vệt quỹ đạo, sóng Thủy triều, đường nứt Phân rã
  // và đường sức Hội tụ: chỉ khác tần số góc, tần số bán kính, hướng, tốc độ và độ sắc.
  float ang=atan(p.y,p.x);
@@ -260,23 +292,23 @@ void main(){
  float seam=smoothstep(1.0,0.965,abs(ang)*0.3183);
  float ph1=ang*uL1a.x+d*(uL1a.y+uVel*6.0)+p.x*uL1a.z+p.y*uL1a.w+uTime*uL1b.x;
  float w1=sin(ph1+sin(p.y*uL1b.w-uTime*0.21)*1.2)*0.5+0.5;
- col+=uGlow*pow(w1,uL1b.y)*uL1b.z*seam*(1.0-smoothstep(0.25,1.30,d))*(1.0+uVel*0.8);
+ col+=uGlow*uAdd*pow(w1,uL1b.y)*uL1b.z*seam*(1.0-smoothstep(0.25,1.30,d))*(1.0+uVel*0.8);
  float ph2=ang*uL2a.x+d*uL2a.y+p.x*uL2a.z+p.y*uL2a.w+uTime*uL2b.x;
- col+=uGlow*pow(sin(ph2)*0.5+0.5,uL2b.y)*uL2b.z*seam*(1.0-smoothstep(0.30,1.35,d));
+ col+=uGlow*uAdd*pow(sin(ph2)*0.5+0.5,uL2b.y)*uL2b.z*seam*(1.0-smoothstep(0.30,1.35,d));
  // Phân rã còn tách nền thành các mặt phẳng lệch sáng. Dùng lại pha của họ đường thứ hai, không thêm phép sin.
  col*=1.0+(fract(ph2*0.159)-0.5)*uX.x;
  // Dư âm lắng về lại gradient thuần: độ phức tạp của môi trường giảm dần thay vì tắt đi.
  col=mix(col,mix(col,grad,0.55),uX.y);
- col*=1.0-0.4*smoothstep(0.32,1.2,length((uv-0.5)*vec2(uAspect,1.0)));
+ col*=1.0-uVignette*smoothstep(0.32,1.2,length((uv-0.5)*vec2(uAspect,1.0)));
  col+=(hash(uv*vec2(1733.0,1097.0)+fract(uTime)*19.0)-0.5)*0.009;
  gl_FragColor=vec4(col,1.0);
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
 }`;
-function Backdrop({env}){
+function Backdrop({env,theme}){
  const {size}=useThree();
  const uniforms=useMemo(()=>({uTop:{value:new THREE.Color()},uBottom:{value:new THREE.Color()},uGlow:{value:new THREE.Color()},
-  uTime:{value:0},uAspect:{value:1},uEnergy:{value:0},uVel:{value:0},uGlowBase:{value:.3},
+  uTime:{value:0},uAspect:{value:1},uEnergy:{value:0},uVel:{value:0},uGlowBase:{value:.3},uVignette:{value:.4},uAdd:{value:1},uCore:{value:1},
   uFocus:{value:new THREE.Vector2(.5,.52)},
   uF:{value:new THREE.Vector4()},uL1a:{value:new THREE.Vector4()},uL1b:{value:new THREE.Vector4()},
   uL2a:{value:new THREE.Vector4()},uL2b:{value:new THREE.Vector4()},uX:{value:new THREE.Vector4()}}),[]);
@@ -295,6 +327,8 @@ function Backdrop({env}){
   uniforms.uL2b.value.set(b[16],b[17],b[18],b[24]);
   uniforms.uX.value.set(b[19],b[20],b[21],b[22]);
   uniforms.uGlowBase.value=b[23];
+  // Bóng mờ bốn góc là chiều sâu trên nền tối, nhưng trên nền sáng nó chỉ là một lớp xám bẩn.
+  uniforms.uVignette.value=theme.vignette;uniforms.uAdd.value=theme.add;uniforms.uCore.value=theme.core;
  });
  return <mesh renderOrder={-1} frustumCulled={false}>
   <planeGeometry args={[2,2]}/>
@@ -339,9 +373,29 @@ void main(){
  gl_FragColor=vec4(uColor,smoothstep(0.5,0.0,d)*vAlpha*uOpacity);
  #include <colorspace_fragment>
 }`;
-function Atmosphere({theme,env,still,low}){
+// 22 hạt phát sáng đáng ra là điểm nhấn của Nở rộ và Hội tụ, nhưng viền sáng cộng thẳng vào outgoingLight
+// thì bị tone-mapping kéo xuống, nên trên ảnh chụp chúng chỉ là chấm xám. Lớp quầng này là một tấm phẳng
+// cho mỗi hạt, luôn quay mặt về camera, vẽ một vệt sáng mềm cộng dồn. Một draw call, 22 tấm, không render
+// target — rẻ hơn một lượt bloom rất nhiều và không phá cam kết tương thích GPU của trang.
+const HALO_VERT=`
+uniform float uScale;varying vec2 vUv;
+void main(){
+ vUv=uv;
+ vec4 c=modelViewMatrix*instanceMatrix*vec4(0.0,0.0,0.0,1.0);
+ c.xy+=position.xy*length(instanceMatrix[0].xyz)*uScale;
+ gl_Position=projectionMatrix*c;
+}`;
+const HALO_FRAG=`
+uniform vec3 uColor;uniform float uOpacity;varying vec2 vUv;
+void main(){
+ float d=length(vUv-0.5)*2.0;
+ if(d>1.0)discard;
+ gl_FragColor=vec4(uColor,(pow(1.0-d,3.2)+pow(1.0-d,1.35)*0.42)*uOpacity);
+ #include <colorspace_fragment>
+}`;
+function Atmosphere({theme,env,still,count}){
  const {viewport}=useThree();
- const count=low?260:520;
+ const mat=useRef();
  const geo=useMemo(()=>{
   const g=new THREE.BufferGeometry(),pos=new Float32Array(count*3),seed=new Float32Array(count);
   for(let i=0;i<count;i++){pos[i*3]=(Math.random()-.5)*16;pos[i*3+1]=(Math.random()-.5)*11;pos[i*3+2]=(Math.random()-.5)*9-1;seed[i]=Math.random()}
@@ -351,7 +405,12 @@ function Atmosphere({theme,env,still,low}){
  },[count]);
  const uniforms=useMemo(()=>({uTime:{value:0},uSize:{value:26},uPixelRatio:{value:1},uVel:{value:0},uPointer:{value:new THREE.Vector2()},
   uColor:{value:new THREE.Color()},uOpacity:{value:0},uM1:{value:new THREE.Vector4()},uM2:{value:new THREE.Vector4()}}),[]);
- useEffect(()=>{uniforms.uColor.value.set(theme.dust)},[theme,uniforms]);
+ // Cộng dồn trên nền tối là ánh sáng; trên nền sáng nó chỉ đẩy mọi thứ về trắng, và hạt bụi đọc ra
+ // thành tuyết rơi. Giao diện sáng vì vậy dùng pha trộn thường với hạt màu tối.
+ useEffect(()=>{
+  uniforms.uColor.value.set(theme.dust);
+  if(mat.current&&mat.current.blending!==theme.dustBlend){mat.current.blending=theme.dustBlend;mat.current.needsUpdate=true}
+ },[theme,uniforms]);
  useEffect(()=>()=>geo.dispose(),[geo]);
  useFrame((_,dt)=>{
   const s=Math.min(dt,.05);
@@ -364,11 +423,11 @@ function Atmosphere({theme,env,still,low}){
  });
  return <points frustumCulled={false}>
   <primitive object={geo} attach="geometry"/>
-  <shaderMaterial uniforms={uniforms} vertexShader={DUST_VERT} fragmentShader={DUST_FRAG} transparent depthWrite={false} blending={THREE.AdditiveBlending}/>
+  <shaderMaterial ref={mat} uniforms={uniforms} vertexShader={DUST_VERT} fragmentShader={DUST_FRAG} transparent depthWrite={false} blending={theme.dustBlend}/>
  </points>;
 }
 function Forms({signal,paused,reduced,speed,pointer,pointerOn,theme,still,env,low}){
- const group=useRef(),key=useRef(),fill=useRef(),amb=useRef(),meshes=useRef([]);
+ const group=useRef(),key=useRef(),fill=useRef(),amb=useRef(),meshes=useRef([]),halo=useRef();
  const time=useRef(0),spin=useRef(0),vel=useRef(0),shift=useRef(0);
  const {size,invalidate,camera,scene}=useThree();
  const forms=useMemo(makeForms,[]);
@@ -378,7 +437,11 @@ function Forms({signal,paused,reduced,speed,pointer,pointerOn,theme,still,env,lo
  const cur=useMemo(()=>new Float64Array(SN),[]);
  const scratch=useMemo(()=>({q:new THREE.Quaternion(),pos:new THREE.Vector3(),dir:new THREE.Vector3(),tgt:new THREE.Vector3(),ray:new THREE.Vector3(),hit:new THREE.Vector3(),fwd:new THREE.Vector3()}),[]);
  const base=useMemo(()=>({top:new THREE.Color(theme.top),bottom:new THREE.Color(theme.bottom),glow:new THREE.Color(theme.glow),
-  key:new THREE.Color(theme.keyColor),fill:new THREE.Color(theme.fillColor)}),[theme]);
+  key:new THREE.Color(theme.keyColor),fill:new THREE.Color(theme.fillColor),rim:new THREE.Color(theme.rim),
+  envSky:new THREE.Color(theme.envSky),envGround:new THREE.Color(theme.envGround)}),[theme]);
+ const haloGeo=useMemo(()=>new THREE.PlaneGeometry(1,1),[]);
+ const haloU=useMemo(()=>({uColor:{value:new THREE.Color()},uOpacity:{value:0},uScale:{value:low?4.6:6.4}}),[low]);
+ useEffect(()=>()=>haloGeo.dispose(),[haloGeo]);
  const axes=useMemo(()=>ROLES.map(role=>Array.from({length:role.n},(_,i)=>new THREE.Vector3(Math.sin(i*1.7),Math.cos(i*2.3),Math.sin(i*3.1)).normalize())),[]);
  const seeds=useMemo(()=>ROLES.map(role=>Array.from({length:role.n},(_,i)=>((i*53)%97)/97)),[]);
  useEffect(()=>{
@@ -419,7 +482,7 @@ function Forms({signal,paused,reduced,speed,pointer,pointerOn,theme,still,env,lo
   // Khối đặt trước, con trỏ đọc sau: cần ma trận thế giới mới nhất để đổi vị trí con trỏ về hệ toạ độ của nhóm.
   const wanted=narrow?0:lerp(SHIFT[a],SHIFT[b],morph);
   shift.current=still?wanted:damp(shift.current,wanted,6,dt);
-  group.current.position.set(shift.current,(narrow?.85:0)+lerp(LIFT[a],LIFT[b],morph),0);
+  group.current.position.set(shift.current,(narrow?1.35:0)+lerp(LIFT[a],LIFT[b],morph),0);
   group.current.scale.setScalar((narrow?.6:.86)*lerp(.82,1,ease));
   group.current.rotation.set(.2+pointer.current.y*.12*touch,
    -.28+(reduced?a:p)*.3+time.current*.07+s.turn+spin.current,
@@ -457,9 +520,12 @@ function Forms({signal,paused,reduced,speed,pointer,pointerOn,theme,still,env,lo
     const breathe=1+Math.sin(time.current*.7+seed*TAU)*.02*live;
     d.scale.lerpVectors(A[i].s,B[i].s,blend).multiplyScalar(ease*breathe*(1-burst*.18));
     d.updateMatrix();mesh.setMatrixAt(i,d.matrix);
+    // Quầng sáng dùng lại đúng ma trận của hạt, nên nó không bao giờ lệch khỏi hạt nó thuộc về.
+    if(r===2&&halo.current)halo.current.setMatrixAt(i,d.matrix);
    }
    mesh.instanceMatrix.needsUpdate=true;
   }
+  if(halo.current)halo.current.instanceMatrix.needsUpdate=true;
   // Camera, đèn, sương và nền cùng đọc một bảng trạng thái nên chúng luôn đổi đồng bộ với hình khối.
   // Chỉ số chạy trên bảng đôi: p*2 đi qua cả hàng chẵn lẫn hàng lẻ, còn chương cuối dùng thêm tiến độ
   // riêng của chính nó để lắng dần thay vì đứng yên ngay khi vừa tới.
@@ -472,7 +538,7 @@ function Forms({signal,paused,reduced,speed,pointer,pointerOn,theme,still,env,lo
   camera.position.x=damp(camera.position.x,cur[0]+px,4,dt);
   camera.position.y=damp(camera.position.y,cur[1]+py,4,dt);
   camera.position.z=damp(camera.position.z,cur[2]+(narrow?1.7:0)+burst*.5+vel.current*.4,4,dt);
-  scratch.tgt.set(cur[3],cur[4]+(narrow?.6:0),cur[5]);
+  scratch.tgt.set(cur[3],cur[4]+(narrow?.78:0),cur[5]);
   camera.lookAt(scratch.tgt);
   const fov=cur[6]+(narrow?4:0)+vel.current*3.5-burst*1.2;
   if(Math.abs(camera.fov-fov)>.01){camera.fov=fov;camera.updateProjectionMatrix()}
@@ -487,10 +553,22 @@ function Forms({signal,paused,reduced,speed,pointer,pointerOn,theme,still,env,lo
   fill.current.color.copy(base.fill).offsetHSL(tint*.08,mag*.10,0);
   for(const m of materials)m.userData.rim.uRimStrength.value=theme.rimStrength*m.userData.rim.uRimBase*cur[13];
   materials[2].emissiveIntensity=theme.emissive*cur[20];
-  const sat=(cur[17]-1)*.25;
+  const sat=(cur[17]-1)*.45;
   env.top.copy(base.top).offsetHSL(cur[16],sat,cur[18]);
   env.bottom.copy(base.bottom).offsetHSL(cur[16],sat,cur[18]*.7);
   env.glow.copy(base.glow).offsetHSL(cur[16],sat*1.2,cur[18]*.5).multiplyScalar(cur[19]);
+  // Hộp sáng giả của kim loại đọc đúng bảng màu vừa tính, nên phản chiếu trên phiến đổi màu cùng nhịp với
+  // nền thay vì đứng nguyên một tông suốt tám chương. Đó là điều một envMap thật sẽ làm, không cần tải gì.
+  for(const m of materials){
+   const u=m.userData.rim;
+   u.uEnvSky.value.copy(base.envSky).offsetHSL(cur[16],sat*.8,cur[18]*.4);
+   u.uEnvGround.value.copy(base.envGround).offsetHSL(cur[16],sat*.6,cur[18]*.3);
+   u.uEnvStrength.value=theme.envStrength*u.uEnvBase*(.75+cur[19]*.35);
+  }
+  haloU.uColor.value.copy(env.glow).lerp(base.rim,.62);
+  haloU.uOpacity.value=theme.halo*ease*clamp(cur[20]*.55,0,1.1);
+  // Quầng là lớp cộng dồn trong suốt, tức là vẽ chồng. Khi nó mờ tới mức không thấy thì đừng vẽ nữa.
+  if(halo.current)halo.current.visible=haloU.uOpacity.value>.012;
   if(scene.fog){
    const cd=camera.position.length();
    scene.fog.color.copy(env.bottom).lerp(env.top,.45);
@@ -525,31 +603,47 @@ function Forms({signal,paused,reduced,speed,pointer,pointerOn,theme,still,env,lo
    {ROLES.map((role,r)=><instancedMesh key={r} ref={el=>{meshes.current[r]=el}} args={[null,null,role.n]} frustumCulled={false} material={materials[r]}>
     <primitive object={geometries[r]} attach="geometry"/>
    </instancedMesh>)}
+   <instancedMesh ref={halo} args={[null,null,NODES]} frustumCulled={false} renderOrder={2}>
+    <primitive object={haloGeo} attach="geometry"/>
+    <shaderMaterial uniforms={haloU} vertexShader={HALO_VERT} fragmentShader={HALO_FRAG} transparent depthWrite={false} blending={THREE.AdditiveBlending}/>
+   </instancedMesh>
   </group>
  </>;
 }
-function SceneFallback(){return <div className="model-fallback"><div className="model-fallback-form"/><span>Không thể khởi tạo WebGL trên thiết bị này</span></div>}
+function SceneFallback({onReady}){
+ useEffect(()=>{onReady?.()},[onReady]);
+ return <div className="model-fallback"><div className="model-fallback-form"/><span>Không thể khởi tạo WebGL trên thiết bị này</span></div>;
+}
 export default function Scene(props){
  const [contextLost,setContextLost]=useState(false);
  const theme=PALETTE[props.light?'light':'dark'];
  const still=props.paused||props.reduced||props.hidden;
- const low=typeof window!=='undefined'&&window.innerWidth<700;
+ // Bản trước đọc bề rộng đúng một lần lúc mount, nên xoay tablet thì bố cục đổi mà số hạt bụi và
+ // trọng số nền vẫn giữ mức của hướng cũ. Hai hệ cùng đo một ngưỡng thì phải cùng đổi.
+ const [low,setLow]=useState(()=>typeof window!=='undefined'&&window.innerWidth<700);
+ useEffect(()=>{
+  const measure=()=>setLow(innerWidth<700);
+  addEventListener('resize',measure);addEventListener('orientationchange',measure);
+  return()=>{removeEventListener('resize',measure);removeEventListener('orientationchange',measure)};
+ },[]);
  // Trạng thái môi trường dùng chung, cấp phát một lần. Forms ghi, Backdrop và Atmosphere đọc trong cùng khung hình.
  const env=useMemo(()=>({top:new THREE.Color(),bottom:new THREE.Color(),glow:new THREE.Color(),
   l1:[0,0,0,0],l2:[0,0,0,0],bg:new Float64Array(BN),vel:0,energy:0,focus:0,focusY:.52,px:0,py:0,intro:0}),[]);
  useEffect(()=>{if(contextLost){const id=setTimeout(()=>setContextLost(false),1200);return()=>clearTimeout(id)}},[contextLost]);
- if(contextLost)return <SceneFallback/>;
- return <Canvas fallback={<SceneFallback/>} frameloop={still?'demand':'always'} dpr={[1,1.25]} camera={{position:[0,0,9.6],fov:40}}
+ if(contextLost)return <SceneFallback onReady={props.onReady}/>;
+ return <Canvas fallback={<SceneFallback onReady={props.onReady}/>} frameloop={still?'demand':'always'} dpr={[1,1.25]} camera={{position:[0,0,9.6],fov:40}}
   gl={{alpha:false,antialias:true,powerPreference:'default',failIfMajorPerformanceCaveat:false}}
   onCreated={({gl})=>{
    const onLost=event=>{event.preventDefault();setContextLost(true)};
    gl.domElement.addEventListener('webglcontextlost',onLost);
    gl.domElement.addEventListener('webglcontextrestored',()=>setContextLost(false));
+   // Màn mở đầu chỉ nhấc lên khi context thật sự dựng xong, không phải khi chunk vừa tải về.
+   props.onReady?.();
   }}>
   <color attach="background" args={[theme.bg]}/>
   <fog attach="fog" args={[theme.bg,4,18]}/>
   <Forms {...props} theme={theme} still={still} env={env} low={low}/>
-  <Backdrop env={env}/>
-  <Atmosphere theme={theme} env={env} still={still} low={low}/>
+  <Backdrop env={env} theme={theme}/>
+  <Atmosphere theme={theme} env={env} still={still} count={low?260:520}/>
  </Canvas>;
 }

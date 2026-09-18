@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://limen-interactive-exhibition.vercel.app/sitemap.xml
